@@ -1,5 +1,7 @@
 import type { ChatTurn } from "../request/chat";
 import instructions from "../request/instructions.json";
+import { logger } from "@neup/logica/logger";
+import { redactLogSecrets } from "../../app/server-logger";
 
 export const modelId = "gemini-3.1-flash-lite";
 
@@ -46,4 +48,31 @@ export function readResponse(result: unknown): string | undefined {
   if (!Array.isArray(parts)) return undefined;
   const text = parts.flatMap((part) => part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string" ? [(part as { text: string }).text] : []).join("");
   return text || undefined;
+}
+
+export async function requestGeminiFlashLite({ apiKey, messages }: { apiKey: string; messages: ChatTurn[] }): Promise<{ output: string } | { error: string; status: number }> {
+  try {
+    const request = buildRequest(messages);
+    const headers = new Headers(request.headers);
+    headers.set("x-goog-api-key", apiKey);
+    const response = await fetch(request.url, {
+      method: requestFormat.method,
+      headers,
+      body: JSON.stringify(request.body),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const responseBody = await response.text();
+    try { await logger.type("ai-response").data({ provider: "google", model: modelId, status: response.status, ok: response.ok, response: redactLogSecrets(responseBody, [apiKey]) }).log(); } catch { /* Logging must not interrupt provider response handling. */ }
+    let result: unknown;
+    try { result = JSON.parse(responseBody); } catch { result = null; }
+    if (!response.ok) {
+      const payload = result as { error?: { message?: unknown }; message?: unknown } | null;
+      const detail = typeof payload?.error?.message === "string" ? payload.error.message : typeof payload?.message === "string" ? payload.message : responseBody.slice(0, 500) || "The provider request failed.";
+      return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
+    }
+    const output = readResponse(result);
+    return typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "The Google model request could not be completed.", status: 502 };
+  }
 }

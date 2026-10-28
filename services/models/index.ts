@@ -1,8 +1,7 @@
 import "server-only";
-import { buildGoogleRequest, readGoogleResponse } from "./google.default";
+import { requestGoogle } from "./google.default";
 import { buildOpenAIRequest, readOpenAIResponse } from "./openai.default";
 import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.default";
-import { buildRequest as buildGeminiFlashLiteRequest, readResponse as readGeminiFlashLiteResponse, supportsModel as supportsGeminiFlashLite } from "./googleapis.gemini-3.1-flash-lite";
 import instructions from "../request/instructions.json";
 import { compileChat, compileChatPrompt, type ChatTurn } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
@@ -25,7 +24,6 @@ export type ModelResponse =
 
 function readGenericResponse(provider: string, result: any): string | undefined {
   if (provider === "anthropic") return result?.content?.find((part: { type?: string }) => part.type === "text")?.text;
-  if (provider === "google") return readGeminiFlashLiteResponse(result) ?? readGoogleResponse(result);
   if (provider === "openrouter") return readOpenRouterResponse(result);
   if (provider === "openai") return readOpenAIResponse(result);
   if (typeof result?.choices?.[0]?.message?.content === "string") return result.choices[0].message.content;
@@ -34,6 +32,7 @@ function readGenericResponse(provider: string, result: any): string | undefined 
 
 export async function requestModel({ provider: rawProvider, model, apiKey, messages, requestFormat }: ModelRequest): Promise<ModelResponse> {
   const provider = rawProvider.toLowerCase();
+  if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat });
   const chatHistory = compileChat(messages);
   const prompt = compileChatPrompt(messages, instructions.default);
   let url: string;
@@ -54,20 +53,11 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
       body = curl.body;
       if (!curlTemplate.includes("{{apikey}}") && !headers.has("authorization") && !headers.has("x-api-key") && !headers.has("x-goog-api-key")) {
         if (provider === "anthropic") headers.set("x-api-key", apiKey);
-        else if (provider === "google") headers.set("x-goog-api-key", apiKey);
         else headers.set("authorization", `Bearer ${apiKey}`);
       }
       if (!headers.has("content-type") && body !== undefined) headers.set("content-type", "application/json");
     } else {
-      if (provider === "google") {
-        const request = supportsGeminiFlashLite(model)
-          ? buildGeminiFlashLiteRequest(messages)
-          : buildGoogleRequest({ model, messages });
-        url = request.url;
-        body = JSON.stringify(request.body);
-        for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
-        headers.set("x-goog-api-key", apiKey);
-      } else if (provider === "openrouter") {
+      if (provider === "openrouter") {
         const request = buildOpenRouterRequest({ model, messages });
         url = request.url;
         body = JSON.stringify(request.body);

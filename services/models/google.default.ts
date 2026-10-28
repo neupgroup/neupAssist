@@ -1,5 +1,12 @@
 import type { ChatMessage } from "../chat";
 import instructions from "../request/instructions.json";
+import { compileChat, compileChatPrompt } from "../request/chat";
+import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
+import { logger } from "@neup/logica/logger";
+import { redactLogSecrets } from "../../app/server-logger";
+import { requestGeminiFlashLite, supportsModel as supportsGeminiFlashLite } from "./googleapis.gemini-3.1-flash-lite";
+
+export type GoogleModelResponse = { output: string } | { error: string; status: number };
 
 export const googleRequestFormat = {
   endpoint: "POST /v1beta/interactions",
@@ -49,4 +56,59 @@ export function buildGoogleRequest({ model, messages, systemInstruction = instru
       input: messages.map(({ role, content }) => (role === "assistant" ? "Assistant: " : "User: ") + content).join("\n\n"),
     },
   };
+}
+
+/** Handles the complete Google API call, including model-specific formats. */
+export async function requestGoogle({ model, apiKey, messages, requestFormat }: {
+  model: string;
+  apiKey: string;
+  messages: ChatMessage[];
+  requestFormat?: string | null;
+}): Promise<GoogleModelResponse> {
+  if (supportsGeminiFlashLite(model) && !requestFormat?.trim()) {
+    return requestGeminiFlashLite({ apiKey, messages });
+  }
+
+  const chatHistory = compileChat(messages);
+  const prompt = compileChatPrompt(messages, instructions.default);
+  let url: string;
+  let method = "POST";
+  let headers = new Headers({ "Content-Type": "application/json" });
+  let body: BodyInit | undefined;
+  let responseFormat: string | null = null;
+  const customFormat = requestFormat?.trim();
+
+  try {
+    if (customFormat) {
+      const [curlTemplate, ...responseParts] = customFormat.split(RESPONSE_FORMAT_SEPARATOR);
+      responseFormat = responseParts.length ? responseParts.join(RESPONSE_FORMAT_SEPARATOR).trim() : null;
+      const curl = renderCurlTemplate(curlTemplate, { model, provider: "google", input: prompt, chathistory: chatHistory, apikey: apiKey });
+      url = curl.url;
+      method = curl.method;
+      headers = curl.headers;
+      body = curl.body;
+      if (!curlTemplate.includes("{{apikey}}") && !headers.has("authorization") && !headers.has("x-api-key") && !headers.has("x-goog-api-key")) headers.set("x-goog-api-key", apiKey);
+      if (!headers.has("content-type") && body !== undefined) headers.set("content-type", "application/json");
+    } else {
+      const request = buildGoogleRequest({ model, messages });
+      url = request.url;
+      body = JSON.stringify(request.body);
+      for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
+      headers.set("x-goog-api-key", apiKey);
+    }
+
+    const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(60_000) });
+    const responseBody = await response.text();
+    try { await logger.type("ai-response").data({ provider: "google", model, status: response.status, ok: response.ok, response: redactLogSecrets(responseBody, [apiKey]) }).log(); } catch { /* Logging must not interrupt provider response handling. */ }
+    let result: any;
+    try { result = JSON.parse(responseBody); } catch { result = null; }
+    if (!response.ok) {
+      const detail = typeof result?.error?.message === "string" ? result.error.message : typeof result?.message === "string" ? result.message : responseBody.slice(0, 500) || "The provider request failed.";
+      return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
+    }
+    const output = responseFormat ? extractOutputByFormat(responseBody, responseFormat) : readGoogleResponse(result) ?? (customFormat ? responseBody : undefined);
+    return typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "The Google request could not be completed.", status: 502 };
+  }
 }
