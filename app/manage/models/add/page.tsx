@@ -14,6 +14,7 @@ export default function AddModelPage() {
   const [providersList, setProvidersList] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
   const [modelName, setModelName] = useState("");
+  const [modelCode, setModelCode] = useState("");
   const [reqMethod, setReqMethod] = useState("");
   const [costInput, setCostInput] = useState("");
   const [costOutput, setCostOutput] = useState("");
@@ -41,7 +42,7 @@ export default function AddModelPage() {
       const response = await fetch("/api/manage/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider_id: Number(providerId), model_name: modelName, cost_input: costInput, cost_output: costOutput, reqMethod, status }),
+        body: JSON.stringify({ provider_id: Number(providerId), name: modelName, code: modelCode, cost_input: costInput, cost_output: costOutput, reqMethod, status }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save model.");
@@ -63,10 +64,11 @@ export default function AddModelPage() {
           <div className="settings-panel-header"><div><h2>Model details</h2><p>The new model will be added to the end of the priority list.</p></div><span className="access-icon"><Icon name="code" size={17} /></span></div>
           <label className="setting-field"><span>Provider</span><select className="settings-select key-provider" value={providerId} onChange={(event) => setProviderId(event.target.value)} required disabled={!providersList.length}><option value="">{providersList.length ? "Select a provider" : "Add an active provider first"}</option>{providersList.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}</select></label>
           <label className="setting-field"><span>Model name</span><Input value={modelName} onChange={(event) => setModelName(event.target.value)} placeholder="e.g. gpt-4.1" required /></label>
+          <label className="setting-field"><span>Model code <small>Sent to the provider API</small></span><Input value={modelCode} onChange={(event) => setModelCode(event.target.value)} placeholder="e.g. gpt-4.1" required /></label>
           <label className="setting-field"><span>Input cost <small>per 1M tokens</small></span><Input type="number" inputMode="decimal" min="0" step="0.00000001" value={costInput} onChange={(event) => setCostInput(event.target.value)} placeholder="0.00" required /></label>
           <label className="setting-field"><span>Output cost <small>per 1M tokens</small></span><Input type="number" inputMode="decimal" min="0" step="0.00000001" value={costOutput} onChange={(event) => setCostOutput(event.target.value)} placeholder="0.00" required /></label>
-          <label className="setting-field"><span>Request method <small>Optional cURL template</small></span><textarea className="reqmethod-input" value={reqMethod} onChange={(event) => setReqMethod(event.target.value)} placeholder={'curl -X POST https://api.example.com/chat -H "Content-Type: application/json" -d \'{"model":"{{model}}","messages":{{input}}}\'\n---response---\n{"output":"{{output}}"}'} rows={8} /></label>
-          <p className="key-form-note"><Icon name="help" size={14} /> Use {'{{model}}'}, {'{{provider}}'}, {'{{input}}'}, and {'{{apikey}}'} in the cURL request. Add an optional <code>---response---</code> line and a JSON response shape containing {'{{output}}'} to extract and show its value.</p>
+          <label className="setting-field"><span>Request method <small>Optional cURL template</small></span><textarea className="reqmethod-input" value={reqMethod} onChange={(event) => setReqMethod(event.target.value)} placeholder={'curl -X POST https://api.example.com/chat -H "Content-Type: application/json" -d \'{"model":"{{modelcode}}","messages":{{input}}}\'\n---response---\n{"output":"{{output}}"}'} rows={8} /></label>
+          <p className="key-form-note"><Icon name="help" size={14} /> Use {'{{modelcode}}'} (or {'{{model}}'}), {'{{provider}}'}, {'{{input}}'}, and {'{{apikey}}'} in the cURL request. The model placeholder uses Model code. Add an optional <code>---response---</code> line and a JSON response shape containing {'{{output}}'} to extract and show its value.</p>
           <label className="setting-field"><span>Status</span><select className="settings-select key-provider" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
           <p className="key-form-note"><Icon name="help" size={14} /> Costs are stored as entered. Keep the unit consistent across catalog entries.</p>
           {message && <p className="keys-message" role="alert">{message}</p>}

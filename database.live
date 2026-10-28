@@ -12,7 +12,8 @@ Table: intelligence_models, Model: IntelligenceModel
 Fields:
 > id: int, auto incremental;
 > provider_id: int, references intelligence_provider.id;
-> model_name: string;
+> name: string;
+> code: string;
 > cost_input: decimal(20, 8);
 > cost_output: decimal(20, 8);
 > reqMethod: text, nullable;

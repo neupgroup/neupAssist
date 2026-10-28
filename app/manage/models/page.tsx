@@ -8,12 +8,14 @@ import { Icon } from "../../ui-icon";
 type ModelEntry = {
   id: number;
   provider: { id: number; name: string; code: string };
-  model_name: string;
+  name: string;
+  code: string;
   cost_input: string;
   cost_output: string;
   status: string;
   order_index: number;
   added_on: string;
+  reqMethod: string | null;
 };
 
 export default function ManageModelsPage() {
@@ -93,7 +95,7 @@ export default function ManageModelsPage() {
           <p className="saved-keys-description">Cost values are shown per 1M tokens. {savingOrder ? "Saving order…" : "Drag a row to change priority."}</p>
           {message && <p className={`keys-message${message.includes("saved") || message.includes("removed") ? " success" : ""}`} role="status">{message}</p>}
           {loading ? <div className="keys-empty"><span className="key-placeholder-dot" />Loading models…</div> : models.length ? <div className="saved-key-list">{models.map((entry, index) => <article className={`saved-key-row model-order-row${dragging === entry.id ? " is-dragging" : ""}`} key={entry.id} draggable={!savingOrder} onDragStart={(event) => { setDragging(entry.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(entry.id)); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const draggedId = Number(event.dataTransfer.getData("text/plain")); if (draggedId) void reorderModels(draggedId, entry.id); }} onDragEnd={() => setDragging(null)}>
-            <span className="model-order-index">{index + 1}</span><span className="model-drag-handle" aria-label="Drag to reorder">⠿</span><span className="saved-key-icon"><Icon name="code" size={16} /></span><div className="saved-key-details"><strong>{entry.model_name}<span> · {entry.provider.name}</span></strong><code>Input {entry.cost_input} · Output {entry.cost_output} / 1M tokens</code><small>Added {new Date(entry.added_on).toLocaleDateString()}</small></div><span className={`model-state${entry.status.toLowerCase() === "active" ? " active" : ""}`}>{entry.status}</span><Button type="button" variant="plain" size="icon" aria-label={`Remove ${entry.model_name}`} className="remove-key-button" onClick={() => void deleteModel(entry.id)}><span aria-hidden="true">×</span></Button>
+            <span className="model-order-index">{index + 1}</span><span className="model-drag-handle" aria-label="Drag to reorder">⠿</span><span className="saved-key-icon"><Icon name="code" size={16} /></span><div className="saved-key-details"><strong>{entry.name}<span> · <Link href={`/manage/provider/${entry.provider.id}`} className="model-provider-link">{entry.provider.name}</Link></span></strong><code>{entry.code} · Input {entry.cost_input} · Output {entry.cost_output} / 1M tokens</code><small>Added {new Date(entry.added_on).toLocaleDateString()}</small></div><span className={`model-state${entry.status.toLowerCase() === "active" ? " active" : ""}`}>{entry.status}</span><Link href={`/manage/models/${entry.id}`} className="docs-link">View / edit</Link><Button type="button" variant="plain" size="icon" aria-label={`Remove ${entry.name}`} className="remove-key-button" onClick={() => void deleteModel(entry.id)}><span aria-hidden="true">×</span></Button>
           </article>)}</div> : <div className="keys-empty"><span className="key-placeholder-dot" />No models in the catalog yet.</div>}
         </section>
       </div>

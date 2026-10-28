@@ -37,7 +37,8 @@ model IntelligenceModel {
   id          Int      @id @default(autoincrement())
   provider_id Int
   provider    IntelligenceProvider @relation(fields: [provider_id], references: [id], onDelete: Restrict)
-  model_name  String
+  name        String
+  code        String
   cost_input  Decimal  @db.Decimal(20, 8)
   cost_output Decimal  @db.Decimal(20, 8)
   reqMethod   String?  @db.Text

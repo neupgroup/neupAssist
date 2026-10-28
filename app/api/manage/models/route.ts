@@ -8,8 +8,8 @@ export async function GET() {
   try {
     const models = await prisma.intelligenceModel.findMany({
       select: {
-        id: true, provider_id: true, model_name: true, cost_input: true, cost_output: true,
-        status: true, order_index: true, added_on: true,
+        id: true, provider_id: true, name: true, code: true, cost_input: true, cost_output: true,
+        reqMethod: true, status: true, order_index: true, added_on: true,
         provider: { select: { id: true, name: true, code: true } },
       },
       orderBy: [{ order_index: "asc" }, { added_on: "desc" }],
@@ -34,15 +34,16 @@ export async function POST(request: Request) {
 
   const data = body as Record<string, unknown>;
   const provider_id = Number(data.provider_id);
-  const model_name = typeof data.model_name === "string" ? data.model_name.trim() : "";
+  const name = typeof data.name === "string" ? data.name.trim() : "";
+  const code = typeof data.code === "string" ? data.code.trim() : "";
   const reqMethod = typeof data.reqMethod === "string" && data.reqMethod.trim() ? data.reqMethod : null;
   const status = typeof data.status === "string" ? data.status.trim() : "";
   const cost_input = typeof data.cost_input === "string" || typeof data.cost_input === "number" ? String(data.cost_input).trim() : "";
   const cost_output = typeof data.cost_output === "string" || typeof data.cost_output === "number" ? String(data.cost_output).trim() : "";
   const validCost = (cost: string) => /^\d+(\.\d{1,8})?$/.test(cost);
 
-  if (!Number.isSafeInteger(provider_id) || provider_id < 1 || !model_name || !["active", "inactive"].includes(status.toLowerCase()) || !validCost(cost_input) || !validCost(cost_output)) {
-    return NextResponse.json({ error: "Select a provider, enter a model name and status, and provide valid non-negative costs (up to 8 decimal places)." }, { status: 400 });
+  if (!Number.isSafeInteger(provider_id) || provider_id < 1 || !name || !code || !["active", "inactive"].includes(status.toLowerCase()) || !validCost(cost_input) || !validCost(cost_output)) {
+    return NextResponse.json({ error: "Select a provider, enter a model name and code, status, and valid non-negative costs (up to 8 decimal places)." }, { status: 400 });
   }
 
   try {
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
     const model = await prisma.intelligenceModel.create({
       data: {
         provider_id,
-        model_name,
+        name,
+        code,
         reqMethod,
         cost_input,
         cost_output,
@@ -58,8 +60,8 @@ export async function POST(request: Request) {
         order_index: (maximum._max.order_index ?? -1) + 1,
       },
       select: {
-        id: true, provider_id: true, model_name: true, cost_input: true, cost_output: true,
-        status: true, order_index: true, added_on: true,
+        id: true, provider_id: true, name: true, code: true, cost_input: true, cost_output: true,
+        reqMethod: true, status: true, order_index: true, added_on: true,
         provider: { select: { id: true, name: true, code: true } },
       },
     });

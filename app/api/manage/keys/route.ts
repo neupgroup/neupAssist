@@ -9,14 +9,14 @@ export async function GET() {
     const keys = await prisma.intelligenceKey.findMany({
       select: {
         id: true, provider: true, model_id: true, key: true, addedOn: true, updatedOn: true, balance: true,
-        modelInfo: { select: { model_name: true } },
+        modelInfo: { select: { name: true } },
       },
       orderBy: { addedOn: "desc" },
     });
 
     return NextResponse.json(keys.map(({ key, balance, modelInfo, ...entry }) => ({
       ...entry,
-      model_name: modelInfo?.model_name ?? null,
+      modelName: modelInfo?.name ?? null,
       keyPreview: key.length > 8 ? `${key.slice(0, 4)}••••${key.slice(-4)}` : "••••••••",
       balance: balance?.toString() ?? null,
     })));
@@ -61,9 +61,9 @@ export async function POST(request: Request) {
     }
     const created = await prisma.intelligenceKey.create({
       data: { provider, model_id: modelId, key, balance: uncapped ? null : balance },
-      select: { id: true, provider: true, model_id: true, addedOn: true, updatedOn: true, balance: true, modelInfo: { select: { model_name: true } } },
+      select: { id: true, provider: true, model_id: true, addedOn: true, updatedOn: true, balance: true, modelInfo: { select: { name: true } } },
     });
-    return NextResponse.json({ ...created, model_name: created.modelInfo?.model_name ?? null, modelInfo: undefined, balance: created.balance?.toString() ?? null }, { status: 201 });
+    return NextResponse.json({ ...created, modelName: created.modelInfo?.name ?? null, modelInfo: undefined, balance: created.balance?.toString() ?? null }, { status: 201 });
   } catch (error) {
     await logApplicationError(error, "POST /api/manage/keys");
     return NextResponse.json({ error: "Could not save the key. Check that the database is migrated and available." }, { status: 503 });
