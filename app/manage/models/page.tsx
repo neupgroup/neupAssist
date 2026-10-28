@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../services/client";
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@neup/components/ui/button";
@@ -28,7 +29,7 @@ export default function ManageModelsPage() {
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/manage/models", { cache: "no-store" });
+      const response = await modelClientService.list();
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to load models.");
       setModels(result);
@@ -55,11 +56,7 @@ export default function ManageModelsPage() {
     setSavingOrder(true);
     setMessage("");
     try {
-      const response = await fetch("/api/manage/models", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((model) => model.id) }),
-      });
+      const response = await modelClientService.reorder(reordered.map((model) => model.id));
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not save model order.");
       setMessage("Model priority saved.");
@@ -75,7 +72,7 @@ export default function ManageModelsPage() {
   async function deleteModel(id: number) {
     setMessage("");
     try {
-      const response = await fetch(`/api/manage/models?id=${id}`, { method: "DELETE" });
+      const response = await modelClientService.remove(id);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to delete model.");
       setModels((current) => current.filter((entry) => entry.id !== id));

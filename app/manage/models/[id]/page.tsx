@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../../services/client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -42,8 +43,8 @@ export default function ModelDetailsPage() {
       setLoading(true);
       try {
         const [modelResponse, providersResponse] = await Promise.all([
-          fetch(`/api/manage/models/${id}`, { cache: "no-store" }),
-          fetch("/api/manage/providers", { cache: "no-store" }),
+          modelClientService.get(Number(id)),
+          providerClientService.list(),
         ]);
         const [modelResult, providersResult] = await Promise.all([modelResponse.json(), providersResponse.json()]);
         if (!modelResponse.ok) throw new Error(modelResult.error || "Unable to load model.");
@@ -74,11 +75,7 @@ export default function ModelDetailsPage() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/manage/models/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider_id: Number(providerId), name: modelName, code: modelCode, cost_input: costInput, cost_output: costOutput, reqMethod, status }),
-      });
+      const response = await modelClientService.update(Number(id), { provider_id: Number(providerId), name: modelName, code: modelCode, cost_input: costInput, cost_output: costOutput, reqMethod, status });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to update model.");
       setModel(result as ModelDetails);

@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../services/client";
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@neup/components/ui/button";
@@ -21,7 +22,7 @@ export default function ManageProvidersPage() {
   const loadProviders = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/manage/providers", { cache: "no-store" });
+      const response = await providerClientService.list();
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to load providers.");
       setProviders(result);
@@ -40,11 +41,7 @@ export default function ManageProvidersPage() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch("/api/manage/providers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, code, status, reqMethod }),
-      });
+      const response = await providerClientService.create({ name, code, status, reqMethod });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save provider.");
       setName("");
@@ -63,11 +60,7 @@ export default function ManageProvidersPage() {
     const nextStatus = provider.status.toLowerCase() === "active" ? "inactive" : "active";
     setMessage("");
     try {
-      const response = await fetch("/api/manage/providers", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: provider.id, status: nextStatus }),
-      });
+      const response = await providerClientService.setStatus(provider.id, nextStatus);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to update provider.");
       setProviders((current) => current.map((entry) => entry.id === provider.id ? result : entry));
@@ -80,7 +73,7 @@ export default function ManageProvidersPage() {
   async function deleteProvider(id: number) {
     setMessage("");
     try {
-      const response = await fetch(`/api/manage/providers?id=${id}`, { method: "DELETE" });
+      const response = await providerClientService.remove(id);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to delete provider.");
       setProviders((current) => current.filter((entry) => entry.id !== id));

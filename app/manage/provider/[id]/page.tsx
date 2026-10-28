@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../../services/client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -35,7 +36,7 @@ export default function ProviderDetailsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/manage/providers/${id}`, { cache: "no-store" })
+    providerClientService.get(Number(id))
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to load provider.");
@@ -57,11 +58,7 @@ export default function ProviderDetailsPage() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/manage/providers/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, code, status, reqMethod }),
-      });
+      const response = await providerClientService.update(Number(id), { name, code, status, reqMethod });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to update provider.");
       setProvider(result as ProviderDetails);
@@ -78,11 +75,7 @@ export default function ProviderDetailsPage() {
     setTestResult(null);
     setTestError("");
     try {
-      const response = await fetch(`/api/manage/providers/${id}/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reqMethod }),
-      });
+      const response = await providerClientService.test(Number(id), reqMethod);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Provider test failed.");
       setTestResult(result as TestResult);

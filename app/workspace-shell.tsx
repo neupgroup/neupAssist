@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../services/client";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -23,7 +24,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<SavedChat[]>([]);
 
   useEffect(() => {
-    const loadChats = () => fetch("/api/chats", { cache: "no-store" })
+    const loadChats = () => chatClientService.list()
       .then(async (response) => {
         if (!response.ok) return;
         const result = await response.json();
@@ -47,13 +48,13 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         <div className="nav-label">Workspace</div>
         <nav className="primary-nav" aria-label="Workspace">
           {navigation.map(({ href, label, icon }) => {
-            const active = pathname === href || (href === "/chat" && pathname.startsWith("/chat/"));
+            const active = pathname === href || (href === "/chat" && pathname.startsWith("/chats/"));
             return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`nav-item${active ? " is-active" : ""}`}><Icon name={icon} size={17} /><span>{label}</span>{active && <span className="nav-active-dot" />}</Link>;
           })}
         </nav>
 
         <div className="history-head"><span className="nav-label">Recent</span><Button variant="plain" size="icon" aria-label="Search chats" className="icon-button"><Icon name="search" size={15} /></Button></div>
-        <div className="history-list" aria-label="Saved chats">{chats.length ? chats.map((chat) => <Link key={chat.id} href={`/chat?chatId=${chat.id}`} className="history-item">{chat.title || "Untitled chat"}</Link>) : <span className="history-empty">No saved chats yet</span>}</div>
+        <div className="history-list" aria-label="Saved chats">{chats.length ? chats.map((chat) => <Link key={chat.id} href={`/chats/${chat.id}`} className="history-item">{chat.title || "Untitled chat"}</Link>) : <span className="history-empty">No saved chats yet</span>}</div>
 
         <div className="sidebar-bottom">
           <div className="plan-card"><span className="plan-icon"><Icon name="sparkles" size={15} /></span><div><strong>Nia Personal</strong><span>Personal assistant workspace</span></div><span className="online-dot" /></div>

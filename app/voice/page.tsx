@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService } from "../../services/client";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@neup/components/ui/button";
@@ -8,13 +9,15 @@ type RecognitionResult = { resultIndex: number; results: ArrayLike<ArrayLike<{ t
 type Recognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: RecognitionResult) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
-export default function VoicePage() {
+export default function VoicePage({ initialChatId }: { initialChatId?: number } = {}) {
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
+  const [conversationReady, setConversationReady] = useState(!initialChatId);
   const recognition = useRef<Recognition | null>(null);
   const orbRef = useRef<HTMLDivElement>(null);
   const chatId = useRef<number | null>(null);
@@ -22,6 +25,36 @@ export default function VoicePage() {
   const transcriptRef = useRef("");
   const sendingRef = useRef(false);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionActive = useRef(false);
+  const recognitionActive = useRef(false);
+  const speakingRef = useRef(false);
+  const userPeak = useRef(0);
+  const capturedText = useRef("");
+
+  useEffect(() => {
+    if (!initialChatId) return;
+    let cancelled = false;
+    chatClientService.get(initialChatId).then(async (response) => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not load saved chat.");
+      if (cancelled) return;
+      chatId.current = result.id;
+      messages.current = result.messages.map((message: { role: "user" | "assistant"; text: string }) => ({ role: message.role, content: message.text }));
+      setReply([...result.messages].reverse().find((message: { role: string }) => message.role === "assistant")?.text ?? "");
+      setConversationReady(true);
+    }).catch((loadError) => {
+      if (!cancelled) {
+        setError(loadError instanceof Error ? loadError.message : "Could not load saved chat.");
+        setConversationReady(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [initialChatId]);
+
+  function startRecognition() {
+    if (!sessionActive.current || speakingRef.current || recognitionActive.current || !recognition.current) return;
+    try { recognition.current.start(); recognitionActive.current = true; } catch { /* It may still be shutting down. */ }
+  }
 
   useEffect(() => {
     const speech = window as SpeechWindow;
@@ -32,24 +65,37 @@ export default function VoicePage() {
     instance.interimResults = true;
     instance.continuous = true;
     instance.onresult = (event) => {
-      const text = Array.from(event.results).map((result) => result[0].transcript).join("").trim();
+      if (speakingRef.current) return;
+      let interim = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index][0];
+        if (result.isFinal) capturedText.current += `${result.transcript} `;
+        else interim += result.transcript;
+      }
+      const text = `${capturedText.current}${interim}`.trim();
       transcriptRef.current = text;
       setTranscript(text);
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
-      if (text) silenceTimer.current = setTimeout(() => instance.stop(), 1100);
+      if (text) silenceTimer.current = setTimeout(() => instance.stop(), 950);
     };
     instance.onend = () => {
-      setListening(false);
+      recognitionActive.current = false;
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
-      if (transcriptRef.current.trim()) void respond(transcriptRef.current);
+      const text = (capturedText.current || transcriptRef.current).trim();
+      capturedText.current = "";
+      transcriptRef.current = "";
+      if (text && sessionActive.current && !speakingRef.current) void respond(text);
+      else if (sessionActive.current && !speakingRef.current) setTimeout(startRecognition, 180);
     };
     instance.onerror = () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
-      setListening(false);
+      recognitionActive.current = false;
+      if (sessionActive.current && !speakingRef.current) setTimeout(startRecognition, 500);
     };
     recognition.current = instance;
     return () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      sessionActive.current = false;
       instance.stop();
     };
   }, []);
@@ -91,6 +137,17 @@ export default function VoicePage() {
           const loudness = Math.sqrt(sum / samples.length);
           smoothedLevel += (loudness > smoothedLevel ? 0.48 : 0.13) * (loudness - smoothedLevel);
           const intensity = Math.min(1, Math.max(0, (smoothedLevel - 0.008) * 5.5));
+          if (speakingRef.current) {
+            const interruptThreshold = Math.max(0.035, userPeak.current * 1.3);
+            if (loudness > interruptThreshold) {
+              window.speechSynthesis?.cancel();
+              speakingRef.current = false;
+              setSpeaking(false);
+              startRecognition();
+            }
+          } else if (recognitionActive.current && loudness > 0.012) {
+            userPeak.current = Math.max(userPeak.current * 0.995, loudness);
+          }
           const change = Math.min(1, Math.abs(intensity - previousLevel) * 4.5);
           previousLevel = intensity;
           const time = performance.now() / 45;
@@ -130,11 +187,33 @@ export default function VoicePage() {
   }, [listening]);
 
   function toggleListening() {
-    if (listening) { recognition.current?.stop(); setListening(false); return; }
+    if (listening) {
+      sessionActive.current = false;
+      speakingRef.current = false;
+      setSpeaking(false);
+      window.speechSynthesis?.cancel();
+      recognition.current?.stop();
+      setListening(false);
+      return;
+    }
+    sessionActive.current = true;
+    capturedText.current = "";
     transcriptRef.current = "";
+    setTranscript(""); setError("");
+    setListening(true);
+    startRecognition();
+  }
+
+  function startNewConversation() {
+    if (listening || sending) return;
+    chatId.current = null;
     messages.current = [];
-    setTranscript(""); setReply(""); setError("");
-    try { recognition.current?.start(); setListening(true); } catch { setListening(false); }
+    transcriptRef.current = "";
+    capturedText.current = "";
+    userPeak.current = 0;
+    setTranscript("");
+    setReply("");
+    setError("");
   }
 
   async function respond(transcribedText: string) {
@@ -145,14 +224,7 @@ export default function VoicePage() {
     setError("");
     setReply("");
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: chatId.current ?? undefined,
-          messages: [...messages.current, { role: "user", content }],
-        }),
-      });
+      const response = await chatClientService.send([...messages.current, { role: "user", content }], chatId.current ?? undefined);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Nia couldn’t complete that request.");
       chatId.current = result.chatId;
@@ -161,15 +233,30 @@ export default function VoicePage() {
       window.dispatchEvent(new Event("chats-updated"));
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(result.reply));
+        const utterance = new SpeechSynthesisUtterance(result.reply);
+        speakingRef.current = true;
+        setSpeaking(true);
+        utterance.onend = () => {
+          speakingRef.current = false;
+          setSpeaking(false);
+          if (sessionActive.current) setTimeout(startRecognition, 180);
+        };
+        utterance.onerror = () => {
+          speakingRef.current = false;
+          setSpeaking(false);
+          if (sessionActive.current) setTimeout(startRecognition, 180);
+        };
+        if (sessionActive.current) window.speechSynthesis.speak(utterance);
+        else { speakingRef.current = false; setSpeaking(false); }
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
     } finally {
       sendingRef.current = false;
       setSending(false);
+      if (sessionActive.current && !speakingRef.current) setTimeout(startRecognition, 180);
     }
   }
 
-  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>Speak naturally. Nia is here to listen.</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state">{listening ? "Listening…" : sending ? "Nia is thinking…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser"}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported || sending}>{listening ? <><Icon name="micOff" size={17} /> Stop listening</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p></div>}{error && <div className="chat-error" role="alert"><p>{error}</p></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
+  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><div className="topbar-actions"><Button variant="outlined" onClick={startNewConversation} disabled={listening || sending}>New conversation</Button><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></div></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>{initialChatId ? "Continue your saved conversation hands-free." : "Speak naturally. Nia is here to listen."}</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state">{!conversationReady ? "Loading saved conversation…" : speaking ? "Nia is speaking — interrupt anytime" : listening ? sending ? "Nia is thinking…" : "Listening…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser"}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported || !conversationReady}>{listening ? <><Icon name="micOff" size={17} /> End voice session</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p></div>}{error && <div className="chat-error" role="alert"><p>{error}</p></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
 }

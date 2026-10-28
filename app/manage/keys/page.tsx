@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../services/client";
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@neup/components/ui/button";
@@ -34,7 +35,7 @@ export default function ManageKeysPage() {
   const loadKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/manage/keys", { cache: "no-store" });
+      const response = await keyClientService.list();
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to load keys.");
       setKeys(result);
@@ -49,8 +50,8 @@ export default function ManageKeysPage() {
   const loadCatalog = useCallback(async () => {
     try {
       const [providerResponse, modelResponse] = await Promise.all([
-        fetch("/api/manage/providers", { cache: "no-store" }),
-        fetch("/api/manage/models", { cache: "no-store" }),
+        providerClientService.list(),
+        modelClientService.list(),
       ]);
       const [providerResult, modelResult] = await Promise.all([providerResponse.json(), modelResponse.json()]);
       if (!providerResponse.ok) throw new Error(providerResult.error || "Unable to load providers.");
@@ -72,11 +73,7 @@ export default function ManageKeysPage() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch("/api/manage/keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: selectedProvider?.name ?? "", model_id: modelId || null, key: secret, balance: uncapped ? null : balance }),
-      });
+      const response = await keyClientService.create({ provider: selectedProvider?.name ?? "", model_id: modelId || null, key: secret, balance: uncapped ? null : balance });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save key.");
       setSecret("");
@@ -95,7 +92,7 @@ export default function ManageKeysPage() {
   async function deleteKey(id: number) {
     setMessage("");
     try {
-      const response = await fetch(`/api/manage/keys?id=${id}`, { method: "DELETE" });
+      const response = await keyClientService.remove(id);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to delete key.");
       setKeys((current) => current.filter((entry) => entry.id !== id));

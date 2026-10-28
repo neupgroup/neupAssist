@@ -1,4 +1,5 @@
 "use client";
+import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../../../services/client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,7 +24,7 @@ export default function AddModelPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("/api/manage/providers", { cache: "no-store" })
+    providerClientService.list()
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to load providers.");
@@ -39,11 +40,7 @@ export default function AddModelPage() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch("/api/manage/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider_id: Number(providerId), name: modelName, code: modelCode, cost_input: costInput, cost_output: costOutput, reqMethod, status }),
-      });
+      const response = await modelClientService.create({ provider_id: Number(providerId), name: modelName, code: modelCode, cost_input: costInput, cost_output: costOutput, reqMethod, status });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save model.");
       router.push("/manage/models");
