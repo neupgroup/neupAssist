@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "../prisma/client/server";
 import { compileChat, compileChatPrompt } from "./request/chat";
+import { contextManager, isContextRequest } from "./request/context-manager";
 
 export async function listChats() {
   return prisma.chat.findMany({ select: { id: true, title: true, lastUpdated: true }, orderBy: { lastUpdated: "desc" }, take: 50 });
@@ -14,6 +15,10 @@ export async function getChat(chatId: number) {
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 export async function sendChat(messages: ChatMessage[], requestedChatId?: number) {
+  const lastAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
+  const requestedContext = lastAssistantMessage ? isContextRequest(lastAssistantMessage.content) : null;
+  const pendingContextRequest = requestedContext ? [...messages].reverse().find((message) => message.role === "user")?.content : undefined;
+  const isContextResponse = Boolean(requestedContext && pendingContextRequest?.startsWith("{\"request\":"));
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model_id: true, key: true, modelInfo: { select: { code: true, provider: { select: { code: true } } } } } });
   const models = await prisma.intelligenceModel.findMany({ where: { status: { equals: "active", mode: "insensitive" } }, orderBy: [{ order_index: "asc" }, { added_on: "asc" }], include: { provider: { select: { name: true, code: true, status: true, reqMethod: true } } } });
   const prioritized = models.flatMap((entry) => {
@@ -62,8 +67,17 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   const title = latestUserMessage.content.trim().slice(0, 120) || "New chat";
   const chat = await prisma.$transaction(async (transaction) => {
     const saved = requestedChatId === undefined ? await transaction.chat.create({ data: { title, status: "served" } }) : await transaction.chat.update({ where: { id: requestedChatId }, data: { status: "served", lastUpdated: new Date() } });
-    await transaction.message.createMany({ data: [{ chat_id: saved.id, type: "userSent", content: latestUserMessage.content }, { chat_id: saved.id, type: "intelligenceReply", content: text.trim() }] });
+    await transaction.message.createMany({ data: [
+      ...(requestedContext && !isContextResponse ? [] : [{ chat_id: saved.id, type: "userSent" as const, content: latestUserMessage.content }]),
+      ...(requestedContext ? [] : [{ chat_id: saved.id, type: "intelligenceReply" as const, content: text.trim() }]),
+    ] });
     return saved;
   });
-  return { reply: text.trim(), provider: credential.provider, model, chatId: chat.id } as const;
+  const reply = text.trim();
+  if (requestedContext && !isContextResponse) {
+    const resolvedRequest = isContextRequest(reply) ?? requestedContext;
+    const context = await contextManager.collect(resolvedRequest);
+    return { reply: "", contextRequest: resolvedRequest, context, provider: credential.provider, model, chatId: chat.id } as const;
+  }
+  return { reply, provider: credential.provider, model, chatId: chat.id } as const;
 }

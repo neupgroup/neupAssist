@@ -1,0 +1,51 @@
+{
+    "default": [
+        "--req--",
+        "--req.personal--",
+        "--req.calendar--",
+        "--req.estate--",
+        "--req.lead--",
+        "--req.tasks--",
+        "--req.notes--",
+        "--req.reminders--",
+        "--req.calendar--"
+    ],
+    "estate": [
+        "--req.estate--",
+        "--req.estate.leads--",
+        "--req.estate.properties--",
+        "--req.estate.tasks--",
+        "--req.estate.notes--",
+        "--req.estate.reminders--",
+        "--req.estate.calendar--",
+        "--req.estate.analytics--",
+        "--req.estate.reports--",
+        "--req.estate.settings--",
+        "--req.estate.notifications--",
+        "--req.estate.documents--",
+        "--req.estate.contacts--",
+        "--req.estate.agents--",
+        "--req.estate.clients--",
+        "--req.estate.transactions--",
+        "--req.estate.inquiries--",
+        "--req.estate.followups--",
+        "--req.estate.appointments--",
+        "--req.estate.offers--",
+        "--req.estate.contracts--",
+        "--req.estate.visitSchedules--"
+    ],
+    "personal": [
+        "--req.personal--",
+        "--req.personal.bio--",
+        "--req.personal.settings--",
+        "--req.personal.preferences--",
+        "--req.personal.notifications--",
+        "--req.personal.security--",
+        "--req.personal.privacy--",
+        "--req.personal.contacts--",
+        "--req.personal.calendar--",
+        "--req.personal.tasks--",
+        "--req.personal.notes--",
+        "--req.personal.reminders--"
+    ]
+}

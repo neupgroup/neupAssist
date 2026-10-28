@@ -9,12 +9,22 @@ type RecognitionResult = { resultIndex: number; results: ArrayLike<ArrayLike<{ t
 type Recognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: RecognitionResult) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
+function getRequestStatus(request: string, stage: number) {
+  const parts = request.replace(/^--req\.?|--$/g, "").split(".").filter(Boolean);
+  const app = parts[0] === "estate" ? "your estate app" : parts[0] === "personal" ? "your personal app" : "your connected apps";
+  const items = parts.slice(1).map((item) => item.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()).join(", ") || "information";
+  if (stage === 0) return "Nia is collecting information to reply.";
+  if (stage === 1) return `Nia is collecting information from ${app} to respond to you.`;
+  return `Nia is collecting ${items} from ${app} to respond to you.`;
+}
+
 export default function VoicePage({ initialChatId }: { initialChatId?: number } = {}) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [requestStatus, setRequestStatus] = useState("");
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
   const [conversationReady, setConversationReady] = useState(!initialChatId);
@@ -221,6 +231,8 @@ export default function VoicePage({ initialChatId }: { initialChatId?: number } 
     if (!content || sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
+    setRequestStatus("Nia is collecting information to reply.");
+    const progressTimer = setTimeout(() => setRequestStatus((current) => current ? "Nia is collecting information from your connected apps to respond to you." : current), 900);
     setError("");
     setReply("");
     try {
@@ -228,12 +240,27 @@ export default function VoicePage({ initialChatId }: { initialChatId?: number } 
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Nia couldn’t complete that request.");
       chatId.current = result.chatId;
-      messages.current = [...messages.current, { role: "user", content }, { role: "assistant", content: result.reply }];
-      setReply(result.reply);
+      let visibleReply = result.reply as string;
+      let nextMessages = [...messages.current, { role: "user" as const, content }];
+      if (result.contextRequest) {
+        setRequestStatus(getRequestStatus(result.contextRequest, 2));
+        const contextReply = JSON.stringify({ request: result.contextRequest, context: result.context });
+        const followup = await chatClientService.send([
+          ...nextMessages,
+          { role: "assistant", content: result.contextRequest },
+          { role: "user", content: contextReply },
+        ], result.chatId);
+        const followupResult = await followup.json();
+        if (!followup.ok) throw new Error(followupResult.error || "Nia couldn’t use the requested context.");
+        visibleReply = followupResult.reply;
+        chatId.current = followupResult.chatId;
+      }
+      messages.current = [...nextMessages, { role: "assistant", content: visibleReply }];
+      setReply(visibleReply);
       window.dispatchEvent(new Event("chats-updated"));
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(result.reply);
+        const utterance = new SpeechSynthesisUtterance(visibleReply);
         speakingRef.current = true;
         setSpeaking(true);
         utterance.onend = () => {
@@ -252,11 +279,13 @@ export default function VoicePage({ initialChatId }: { initialChatId?: number } 
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
     } finally {
+      clearTimeout(progressTimer);
+      setRequestStatus("");
       sendingRef.current = false;
       setSending(false);
       if (sessionActive.current && !speakingRef.current) setTimeout(startRecognition, 180);
     }
   }
 
-  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><div className="topbar-actions"><Button variant="outlined" onClick={startNewConversation} disabled={listening || sending}>New conversation</Button><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></div></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>{initialChatId ? "Continue your saved conversation hands-free." : "Speak naturally. Nia is here to listen."}</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state">{!conversationReady ? "Loading saved conversation…" : speaking ? "Nia is speaking — interrupt anytime" : listening ? sending ? "Nia is thinking…" : "Listening…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser"}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported || !conversationReady}>{listening ? <><Icon name="micOff" size={17} /> End voice session</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p></div>}{error && <div className="chat-error" role="alert"><p>{error}</p></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
+  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><div className="topbar-actions"><Button variant="outlined" onClick={startNewConversation} disabled={listening || sending}>New conversation</Button><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></div></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>{initialChatId ? "Continue your saved conversation hands-free." : "Speak naturally. Nia is here to listen."}</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state" aria-live="polite">{requestStatus || (!conversationReady ? "Loading saved conversation…" : speaking ? "Nia is speaking — interrupt anytime" : listening ? sending ? "Nia is thinking…" : "Listening…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser")}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported || !conversationReady}>{listening ? <><Icon name="micOff" size={17} /> End voice session</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p></div>}{error && <div className="chat-error" role="alert"><p>{error}</p></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
 }
