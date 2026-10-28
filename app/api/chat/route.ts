@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@neup/logica/logger";
 import { logApplicationError } from "../../server-logger";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../curl-template";
+import { compileChat, compileChatPrompt } from "../../../services/request/chat";
 import { prisma } from "../../../prisma/client/server";
 
 export const runtime = "nodejs";
@@ -68,21 +69,24 @@ export async function POST(request: Request) {
           : "https://api.openai.com/v1/chat/completions";
 
     const normalizedMessages = messages as ChatMessage[];
+    const compiledChat = compileChat(normalizedMessages);
+    const persona = "You are Nia, a thoughtful and helpful personal assistant. Be clear, warm, and accurate.";
+    const compiledPrompt = compileChatPrompt(normalizedMessages, persona);
     const providerRequest = provider === "anthropic"
       ? {
           model,
           max_tokens: 2048,
-          system: "You are Nia, a thoughtful and helpful personal assistant. Be clear, warm, and accurate.",
-          messages: normalizedMessages,
+          system: persona,
+          messages: [{ role: "user", content: compiledChat }],
         }
       : provider === "google"
         ? {
-            systemInstruction: { parts: [{ text: "You are Nia, a thoughtful and helpful personal assistant. Be clear, warm, and accurate." }] },
-            contents: normalizedMessages.map((message) => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
+            systemInstruction: { parts: [{ text: persona }] },
+            contents: [{ role: "user", parts: [{ text: compiledChat }] }],
           }
         : {
             model,
-            messages: [{ role: "system", content: "You are Nia, a thoughtful and helpful personal assistant. Be clear, warm, and accurate." }, ...normalizedMessages],
+            messages: [{ role: "user", content: compiledPrompt }],
           };
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -99,8 +103,7 @@ export async function POST(request: Request) {
     if (configuredRequest) {
       const [curlTemplate, ...responseFormatParts] = configuredRequest.split(RESPONSE_FORMAT_SEPARATOR);
       responseFormat = responseFormatParts.length ? responseFormatParts.join(RESPONSE_FORMAT_SEPARATOR).trim() : null;
-      const chatHistory = normalizedMessages.map((message) => `${message.role === "assistant" ? "Nia" : "user"}: ${message.content}`).join("\n");
-      const curl = renderCurlTemplate(curlTemplate, { model, provider: prioritized?.provider.code ?? explicit?.modelInfo?.provider.code ?? credential.provider, input: normalizedMessages.at(-1)?.content ?? "", chathistory: chatHistory, apikey: credential.key });
+      const curl = renderCurlTemplate(curlTemplate, { model, provider: prioritized?.provider.code ?? explicit?.modelInfo?.provider.code ?? credential.provider, input: compiledPrompt, chathistory: compiledChat, apikey: credential.key });
       if (!curlTemplate.includes("{{apikey}}") && !curl.headers.has("authorization") && !curl.headers.has("x-api-key") && !curl.headers.has("x-goog-api-key")) {
         if (provider === "anthropic") curl.headers.set("x-api-key", credential.key);
         else if (provider === "google") curl.headers.set("x-goog-api-key", credential.key);

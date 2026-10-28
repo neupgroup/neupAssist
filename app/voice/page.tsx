@@ -18,6 +18,7 @@ export default function VoicePage() {
   const recognition = useRef<Recognition | null>(null);
   const orbRef = useRef<HTMLDivElement>(null);
   const chatId = useRef<number | null>(null);
+  const messages = useRef<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const transcriptRef = useRef("");
   const sendingRef = useRef(false);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,6 +132,7 @@ export default function VoicePage() {
   function toggleListening() {
     if (listening) { recognition.current?.stop(); setListening(false); return; }
     transcriptRef.current = "";
+    messages.current = [];
     setTranscript(""); setReply(""); setError("");
     try { recognition.current?.start(); setListening(true); } catch { setListening(false); }
   }
@@ -148,12 +150,13 @@ export default function VoicePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chatId: chatId.current ?? undefined,
-          messages: [{ role: "user", content }],
+          messages: [...messages.current, { role: "user", content }],
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Nia couldn’t complete that request.");
       chatId.current = result.chatId;
+      messages.current = [...messages.current, { role: "user", content }, { role: "assistant", content: result.reply }];
       setReply(result.reply);
       window.dispatchEvent(new Event("chats-updated"));
       if ("speechSynthesis" in window) {
