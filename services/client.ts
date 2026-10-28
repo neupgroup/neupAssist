@@ -17,21 +17,3 @@ export const keyClientService = {
   remove: (id: number) => serviceRequest(`/api/manage/keys?id=${id}`, { method: "DELETE" }),
 };
 
-export const providerClientService = {
-  list: () => serviceRequest("/api/manage/providers"),
-  get: (id: number) => serviceRequest(`/api/manage/providers/${id}`),
-  create: (data: unknown) => serviceRequest("/api/manage/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-  update: (id: number, data: unknown) => serviceRequest(`/api/manage/providers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-  setStatus: (id: number, status: string) => serviceRequest("/api/manage/providers", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) }),
-  remove: (id: number) => serviceRequest(`/api/manage/providers?id=${id}`, { method: "DELETE" }),
-  test: (id: number, reqMethod?: string) => serviceRequest(`/api/manage/providers/${id}/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reqMethod }) }),
-};
-
-export const modelClientService = {
-  list: () => serviceRequest("/api/manage/models"),
-  get: (id: number) => serviceRequest(`/api/manage/models/${id}`),
-  create: (data: unknown) => serviceRequest("/api/manage/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-  update: (id: number, data: unknown) => serviceRequest(`/api/manage/models/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-  reorder: (ids: number[]) => serviceRequest("/api/manage/models", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }),
-  remove: (id: number) => serviceRequest(`/api/manage/models?id=${id}`, { method: "DELETE" }),
-};

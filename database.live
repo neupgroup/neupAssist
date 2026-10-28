@@ -2,33 +2,11 @@ Table: intelligence_keys, Model: IntelligenceKey
 Fields:
 > id: int, auto incremental;
 > provider: string;
-> model_id: int, nullable, references intelligence_models.id;
+> model: string, nullable;
 > key: string;
 > addedOn: timestamp, default: current timestamp;
 > updatedOn: timestamp, automatically updated;
 > balance: decimal(20, 8), nullable;
-
-Table: intelligence_models, Model: IntelligenceModel
-Fields:
-> id: int, auto incremental;
-> provider_id: int, references intelligence_provider.id;
-> name: string;
-> code: string;
-> cost_input: decimal(20, 8);
-> cost_output: decimal(20, 8);
-> reqMethod: text, nullable;
-> status: string;
-> order_index: int, default: 0;
-> added_on: timestamp, default: current timestamp;
-
-Table: intelligence_provider, Model: IntelligenceProvider
-Fields:
-> id: int, auto incremental;
-> name: string;
-> code: string;
-> created_on: timestamp, default: current timestamp;
-> status: string;
-> reqMethod: text, nullable;
 
 Table: chats, Model: Chat
 Fields:

@@ -9,12 +9,10 @@ type RecognitionResult = { resultIndex: number; results: ArrayLike<ArrayLike<{ t
 type Recognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: RecognitionResult) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
-function getRequestStatus(request: string, stage: number) {
+function getRequestStatus(request: string) {
   const parts = request.replace(/^--req\.?|--$/g, "").split(".").filter(Boolean);
   const app = parts[0] === "estate" ? "your estate app" : parts[0] === "personal" ? "your personal app" : "your connected apps";
   const items = parts.slice(1).map((item) => item.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()).join(", ") || "information";
-  if (stage === 0) return "Nia is collecting information to reply.";
-  if (stage === 1) return `Nia is collecting information from ${app} to respond to you.`;
   return `Nia is collecting ${items} from ${app} to respond to you.`;
 }
 
@@ -231,30 +229,34 @@ export default function VoicePage({ initialChatId }: { initialChatId?: number } 
     if (!content || sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
-    setRequestStatus("Nia is collecting information to reply.");
-    const progressTimer = setTimeout(() => setRequestStatus((current) => current ? "Nia is collecting information from your connected apps to respond to you." : current), 900);
+    setRequestStatus("");
     setError("");
     setReply("");
     try {
       const response = await chatClientService.send([...messages.current, { role: "user", content }], chatId.current ?? undefined);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Nia couldn’t complete that request.");
-      chatId.current = result.chatId;
-      let visibleReply = result.reply as string;
-      let nextMessages = [...messages.current, { role: "user" as const, content }];
-      if (result.contextRequest) {
-        setRequestStatus(getRequestStatus(result.contextRequest, 2));
-        const contextReply = JSON.stringify({ request: result.contextRequest, context: result.context });
-        const followup = await chatClientService.send([
-          ...nextMessages,
-          { role: "assistant", content: result.contextRequest },
-          { role: "user", content: contextReply },
-        ], result.chatId);
-        const followupResult = await followup.json();
-        if (!followup.ok) throw new Error(followupResult.error || "Nia couldn’t use the requested context.");
-        visibleReply = followupResult.reply;
-        chatId.current = followupResult.chatId;
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Nia couldn’t complete that request.");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let result: Record<string, unknown> | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line) continue;
+          const event = JSON.parse(line) as { type: string; request?: string; result?: Record<string, unknown>; error?: string };
+          if (event.type === "request" && event.request) setRequestStatus(getRequestStatus(event.request));
+          else if (event.type === "final") result = event.result ?? null;
+          else if (event.type === "error") throw new Error(event.error || "Nia couldn’t complete that request.");
+        }
       }
+      if (!result) throw new Error("Nia couldn’t complete that request.");
+      chatId.current = result.chatId as number;
+      const visibleReply = result.reply as string;
+      const nextMessages = [...messages.current, { role: "user" as const, content }];
       messages.current = [...nextMessages, { role: "assistant", content: visibleReply }];
       setReply(visibleReply);
       window.dispatchEvent(new Event("chats-updated"));
@@ -279,7 +281,6 @@ export default function VoicePage({ initialChatId }: { initialChatId?: number } 
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
     } finally {
-      clearTimeout(progressTimer);
       setRequestStatus("");
       sendingRef.current = false;
       setSending(false);

@@ -1,5 +1,5 @@
 "use client";
-import { chatClientService, keyClientService, modelClientService, providerClientService } from "../../services/client";
+import { chatClientService, keyClientService } from "../../services/client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -8,13 +8,6 @@ import { Textarea } from "@neup/components/ui/textarea";
 import { Icon } from "../ui-icon";
 
 type Message = { role: "user" | "assistant"; text: string };
-
-function getRequestDetails(request: string) {
-  const parts = request.replace(/^--req\.?|--$/g, "").split(".").filter(Boolean);
-  const app = parts[0] === "estate" ? "your estate app" : parts[0] === "personal" ? "your personal app" : "your connected apps";
-  const items = parts.slice(1).length ? parts.slice(1).map((item) => item.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()).join(", ") : "information";
-  return { app, items };
-}
 
 export default function ChatPage({ initialChatId }: { initialChatId?: number } = {}) {
   const searchParams = useSearchParams();
@@ -70,36 +63,41 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
     setSending(true);
     setRequestProgress(0);
     setRequestDetails(null);
-    const progressTimer = setTimeout(() => setRequestProgress(1), 900);
     setError("");
     setSetupRequired(false);
     if (inputRef.current) inputRef.current.style.height = "auto";
     try {
       const response = await chatClientService.send(conversation.map(({ role, text: content }) => ({ role, content })), chatId ?? undefined);
-      const result = await response.json();
-      if (!response.ok) { if (result.setupRequired) setSetupRequired(true); throw new Error(result.error || "Nia couldn’t complete that request."); }
-      setChatId(result.chatId);
-      if (result.contextRequest) {
-        setRequestDetails(getRequestDetails(result.contextRequest));
-        setRequestProgress(2);
-        const contextReply = JSON.stringify({ request: result.contextRequest, context: result.context });
-        const followup = await chatClientService.send([
-          ...conversation.map(({ role, text: content }) => ({ role, content })),
-          { role: "assistant" as const, content: result.contextRequest },
-          { role: "user" as const, content: contextReply },
-        ], result.chatId);
-        const followupResult = await followup.json();
-        if (!followup.ok) throw new Error(followupResult.error || "Nia couldn’t use the requested context.");
-        setMessages((current) => [...current, { role: "assistant", text: followupResult.reply }]);
-        setChatId(followupResult.chatId);
-      } else {
-        setMessages((current) => [...current, { role: "assistant", text: result.reply }]);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Nia couldn’t complete that request.");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let result: Record<string, unknown> | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line) continue;
+          const event = JSON.parse(line) as { type: string; request?: string; result?: Record<string, unknown>; error?: string; setupRequired?: boolean };
+          if (event.type === "request" && event.request) {
+            const parts = event.request.replace(/^--req\.?|--$/g, "").split(".").filter(Boolean);
+            const app = parts[0] === "estate" ? "your estate app" : parts[0] === "personal" ? "your personal app" : "your connected apps";
+            setRequestDetails({ app, items: parts.slice(1).join(", ") || "information" });
+            setRequestProgress(2);
+          } else if (event.type === "final") result = event.result ?? null;
+          else if (event.type === "error") { if (event.setupRequired) setSetupRequired(true); throw new Error(event.error || "Nia couldn’t complete that request."); }
+        }
       }
+      if (!result) throw new Error("Nia couldn’t complete that request.");
+      setChatId(result.chatId as number);
+      setMessages((current) => [...current, { role: "assistant", text: result.reply as string }]);
       window.dispatchEvent(new Event("chats-updated"));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
     } finally {
-      clearTimeout(progressTimer);
       setSending(false);
     }
   }
@@ -118,7 +116,7 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
       </div> : <div className="message-list">{messages.map((message, index) => <article className={`message message-${message.role}`} key={`${index}-${message.role}`}>
         {message.role === "assistant" ? <span className="message-avatar"><Icon name="sparkles" size={14} /></span> : <span className="user-message-label">You</span>}
         <div className="message-body"><p>{message.text}</p>{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={14} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={14} /></Button></div>}</div>
-      </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><div className="message-body"><p key={`${requestProgress}-${requestDetails?.app ?? ""}`} className="request-status" aria-live="polite">{requestProgress === 0 ? "Nia is collecting information to reply." : requestProgress === 1 ? `Nia is collecting information from ${requestDetails?.app ?? "your connected apps"} to respond to you.` : `Nia is collecting ${requestDetails?.items ?? "information"} from ${requestDetails?.app ?? "your connected apps"} to respond to you.`}</p></div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
+      </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><div className="message-body"><p key={`${requestProgress}-${requestDetails?.app ?? ""}`} className={requestProgress ? "request-status" : ""} aria-live="polite">{requestProgress === 0 ? "Nia is thinking…" : requestProgress === 1 ? `Nia is collecting information from ${requestDetails?.app ?? "your connected apps"} to respond to you.` : `Nia is collecting ${requestDetails?.items ?? "information"} from ${requestDetails?.app ?? "your connected apps"} to respond to you.`}</p></div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
     </div>
     <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>
       <Textarea ref={inputRef} value={draft} onChange={(event) => { setDraft(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />

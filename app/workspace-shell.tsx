@@ -1,5 +1,5 @@
 "use client";
-import { chatClientService, keyClientService, modelClientService, providerClientService } from "../services/client";
+import { chatClientService } from "../services/client";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -12,8 +12,6 @@ const navigation = [
   { href: "/voice", label: "Voice assistant", icon: "voice" as const },
   { href: "/api", label: "API", icon: "code" as const },
   { href: "/manage/keys", label: "Manage keys", icon: "key" as const },
-  { href: "/manage/providers", label: "Providers", icon: "key" as const },
-  { href: "/manage/models", label: "Manage models", icon: "code" as const },
   { href: "/settings", label: "Settings", icon: "settings" as const },
 ];
 

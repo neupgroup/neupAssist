@@ -1,4 +1,4 @@
-import personaSections from "../services/request/persona.json";
+import personaSections from "../services/request/instructions.json";
 
 export const RESPONSE_FORMAT_SEPARATOR = "\n---response---\n";
 
@@ -43,14 +43,36 @@ function tokenizeCurl(command: string) {
 }
 
 export function renderCurlTemplate(template: string, values: { model: string; provider: string; input: string; chathistory: string; apikey: string }) {
-  const tokens = tokenizeCurl(template).map((token) => token
-    .replaceAll("{{modelcode}}", values.model)
-    .replaceAll("{{model}}", values.model)
-    .replaceAll("{{provider}}", values.provider)
-    .replaceAll("{{input}}", values.input)
-    .replaceAll("{{chathistory}}", values.chathistory)
-    .replaceAll("{{apikey}}", values.apikey)
-    .replace(/\{\{persona(?:\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*))?\}\}/g, (_match, path: string | undefined) => resolvePersona(path)));
+  const encode = (value: string, quoted: boolean) => quoted ? JSON.stringify(value).slice(1, -1) : value;
+  const substitute = (token: string, marker: string, value: string) => {
+    let output = "";
+    let cursor = 0;
+    let inString = false;
+    let escaped = false;
+    while (cursor < token.length) {
+      if (token.startsWith(marker, cursor)) {
+        output += encode(value, inString);
+        cursor += marker.length;
+        continue;
+      }
+      const char = token[cursor++];
+      output += char;
+      if (inString && escaped) escaped = false;
+      else if (inString && char === "\\") escaped = true;
+      else if (char === '"') inString = !inString;
+    }
+    return output;
+  };
+  const tokens = tokenizeCurl(template).map((rawToken) => {
+    let token = rawToken;
+    token = substitute(token, "{{modelcode}}", values.model);
+    token = substitute(token, "{{model}}", values.model);
+    token = substitute(token, "{{provider}}", values.provider);
+    token = substitute(token, "{{input}}", values.input);
+    token = substitute(token, "{{chathistory}}", values.chathistory);
+    token = substitute(token, "{{apikey}}", values.apikey);
+    return token.replace(/\{\{persona(?:\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*))?\}\}/g, (_match, path: string | undefined) => resolvePersona(path));
+  });
   if (tokens[0]?.toLowerCase() === "curl") tokens.shift();
   let url = "";
   let method = "GET";

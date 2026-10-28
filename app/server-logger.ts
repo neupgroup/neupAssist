@@ -1,6 +1,6 @@
 import { logger } from "@neup/logica/logger";
 
-function redactSecrets(value: string, additionalSecrets: string[] = []) {
+export function redactLogSecrets(value: string, additionalSecrets: string[] = []) {
   let redacted = value.replace(/https?:\/\/[^\s"']+/g, "[provider URL redacted]");
   for (const [name, secret] of Object.entries(process.env)) {
     if (secret && secret.length > 7 && /KEY|SECRET|TOKEN|DATABASE_URL/i.test(name)) {
@@ -19,7 +19,7 @@ export async function logApplicationError(error: unknown, context: string, addit
     : String(error);
 
   try {
-    await logger.type("error").data({ context, message: redactSecrets(message, additionalSecrets) }).log();
+    await logger.type("error").data({ context, message: redactLogSecrets(message, additionalSecrets) }).log();
   } catch {
     // Logging failures must not interrupt the request that is reporting an error.
   }
