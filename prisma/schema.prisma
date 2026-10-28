@@ -23,7 +23,8 @@ enum MessageType {
 model IntelligenceKey {
   id        Int      @id @default(autoincrement())
   provider  String
-  model     String?
+  model_id  Int?
+  modelInfo IntelligenceModel? @relation(fields: [model_id], references: [id], onDelete: SetNull)
   key       String
   addedOn   DateTime @default(now()) @db.Timestamp(3)
   updatedOn DateTime @updatedAt @db.Timestamp(3)
@@ -39,9 +40,11 @@ model IntelligenceModel {
   model_name  String
   cost_input  Decimal  @db.Decimal(20, 8)
   cost_output Decimal  @db.Decimal(20, 8)
+  reqMethod   String?  @db.Text
   status      String
   order_index Int      @default(0)
   added_on    DateTime @default(now()) @db.Timestamp(3)
+  keys        IntelligenceKey[]
 
   @@index([order_index])
   @@index([provider_id])
@@ -54,6 +57,7 @@ model IntelligenceProvider {
   code       String
   created_on DateTime @default(now()) @db.Timestamp(3)
   status     String
+  reqMethod  String? @db.Text
   models     IntelligenceModel[]
 
   @@map("intelligence_provider")

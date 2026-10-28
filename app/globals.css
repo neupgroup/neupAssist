@@ -290,6 +290,8 @@
 .add-model-actions .full-button { width: auto; min-width: 150px; }
 .provider-code-hint { color: #89928b; font-size: 12px; font-weight: 400; }
 .provider-status-button { height: 30px !important; flex: 0 0 auto; padding: 0 8px !important; color: #728074 !important; font-size: 12px !important; }
+.reqmethod-input { width: 100%; min-height: 150px; padding: 11px 12px; resize: vertical; border: 1px solid #e3e8e1; border-radius: 8px; background: #fff; color: #48544b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6; }
+.reqmethod-input:focus { border-color: #bdcfbf; outline: 2px solid #597f5b12; }
 .saved-keys-description { margin: 8px 0 15px; color: #818b83; font-size: 14px; line-height: 1.55; }
 .keys-message { margin: 0 0 11px; padding: 9px 11px; border: 1px solid #f0d8d5; border-radius: 8px; background: #fff9f8; color: #a2564f; font-size: 13px; }
 .keys-message.success { border-color: #deeadc; background: #f8fbf7; color: #5f8062; }

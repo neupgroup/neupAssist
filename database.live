@@ -2,7 +2,7 @@ Table: intelligence_keys, Model: IntelligenceKey
 Fields:
 > id: int, auto incremental;
 > provider: string;
-> model: string, nullable;
+> model_id: int, nullable, references intelligence_models.id;
 > key: string;
 > addedOn: timestamp, default: current timestamp;
 > updatedOn: timestamp, automatically updated;
@@ -15,6 +15,7 @@ Fields:
 > model_name: string;
 > cost_input: decimal(20, 8);
 > cost_output: decimal(20, 8);
+> reqMethod: text, nullable;
 > status: string;
 > order_index: int, default: 0;
 > added_on: timestamp, default: current timestamp;
@@ -26,6 +27,7 @@ Fields:
 > code: string;
 > created_on: timestamp, default: current timestamp;
 > status: string;
+> reqMethod: text, nullable;
 
 Table: chats, Model: Chat
 Fields:

@@ -14,6 +14,7 @@ export default function AddModelPage() {
   const [providersList, setProvidersList] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
   const [modelName, setModelName] = useState("");
+  const [reqMethod, setReqMethod] = useState("");
   const [costInput, setCostInput] = useState("");
   const [costOutput, setCostOutput] = useState("");
   const [status, setStatus] = useState("active");
@@ -40,7 +41,7 @@ export default function AddModelPage() {
       const response = await fetch("/api/manage/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider_id: Number(providerId), model_name: modelName, cost_input: costInput, cost_output: costOutput, status }),
+        body: JSON.stringify({ provider_id: Number(providerId), model_name: modelName, cost_input: costInput, cost_output: costOutput, reqMethod, status }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save model.");
@@ -64,6 +65,8 @@ export default function AddModelPage() {
           <label className="setting-field"><span>Model name</span><Input value={modelName} onChange={(event) => setModelName(event.target.value)} placeholder="e.g. gpt-4.1" required /></label>
           <label className="setting-field"><span>Input cost <small>per 1M tokens</small></span><Input type="number" inputMode="decimal" min="0" step="0.00000001" value={costInput} onChange={(event) => setCostInput(event.target.value)} placeholder="0.00" required /></label>
           <label className="setting-field"><span>Output cost <small>per 1M tokens</small></span><Input type="number" inputMode="decimal" min="0" step="0.00000001" value={costOutput} onChange={(event) => setCostOutput(event.target.value)} placeholder="0.00" required /></label>
+          <label className="setting-field"><span>Request method <small>Optional cURL template</small></span><textarea className="reqmethod-input" value={reqMethod} onChange={(event) => setReqMethod(event.target.value)} placeholder={'curl -X POST https://api.example.com/chat -H "Content-Type: application/json" -d \'{"model":"{{model}}","messages":{{input}}}\'\n---response---\n{"output":"{{output}}"}'} rows={8} /></label>
+          <p className="key-form-note"><Icon name="help" size={14} /> Use {'{{model}}'}, {'{{provider}}'}, {'{{input}}'}, and {'{{apikey}}'} in the cURL request. Add an optional <code>---response---</code> line and a JSON response shape containing {'{{output}}'} to extract and show its value.</p>
           <label className="setting-field"><span>Status</span><select className="settings-select key-provider" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
           <p className="key-form-note"><Icon name="help" size={14} /> Costs are stored as entered. Keep the unit consistent across catalog entries.</p>
           {message && <p className="keys-message" role="alert">{message}</p>}

@@ -7,12 +7,16 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const keys = await prisma.intelligenceKey.findMany({
-      select: { id: true, provider: true, model: true, key: true, addedOn: true, updatedOn: true, balance: true },
+      select: {
+        id: true, provider: true, model_id: true, key: true, addedOn: true, updatedOn: true, balance: true,
+        modelInfo: { select: { model_name: true } },
+      },
       orderBy: { addedOn: "desc" },
     });
 
-    return NextResponse.json(keys.map(({ key, balance, ...entry }) => ({
+    return NextResponse.json(keys.map(({ key, balance, modelInfo, ...entry }) => ({
       ...entry,
+      model_name: modelInfo?.model_name ?? null,
       keyPreview: key.length > 8 ? `${key.slice(0, 4)}••••${key.slice(-4)}` : "••••••••",
       balance: balance?.toString() ?? null,
     })));
@@ -36,21 +40,30 @@ export async function POST(request: Request) {
 
   const data = body as Record<string, unknown>;
   const provider = typeof data.provider === "string" ? data.provider.trim() : "";
-  const model = typeof data.model === "string" ? data.model.trim() : "";
+  const modelId = data.model_id === null || data.model_id === undefined || data.model_id === "" ? null : Number(data.model_id);
   const key = typeof data.key === "string" ? data.key.trim() : "";
   const uncapped = data.balance === null;
   const balance = typeof data.balance === "string" || typeof data.balance === "number" ? String(data.balance).trim() : "";
 
-  if (!provider || !key || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
+  if (!provider || !key || (modelId !== null && (!Number.isSafeInteger(modelId) || modelId < 1)) || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
     return NextResponse.json({ error: "Provider, key, and a valid balance (up to 8 decimal places) are required, or select Uncapped." }, { status: 400 });
   }
 
   try {
+    if (modelId !== null) {
+      const selectedModel = await prisma.intelligenceModel.findUnique({
+        where: { id: modelId },
+        include: { provider: { select: { name: true, code: true } } },
+      });
+      if (!selectedModel || (selectedModel.provider.name.toLowerCase() !== provider.toLowerCase() && selectedModel.provider.code.toLowerCase() !== provider.toLowerCase())) {
+        return NextResponse.json({ error: "Choose a model belonging to the selected provider." }, { status: 400 });
+      }
+    }
     const created = await prisma.intelligenceKey.create({
-      data: { provider, model: model || null, key, balance: uncapped ? null : balance },
-      select: { id: true, provider: true, model: true, addedOn: true, updatedOn: true, balance: true },
+      data: { provider, model_id: modelId, key, balance: uncapped ? null : balance },
+      select: { id: true, provider: true, model_id: true, addedOn: true, updatedOn: true, balance: true, modelInfo: { select: { model_name: true } } },
     });
-    return NextResponse.json({ ...created, balance: created.balance?.toString() ?? null }, { status: 201 });
+    return NextResponse.json({ ...created, model_name: created.modelInfo?.model_name ?? null, modelInfo: undefined, balance: created.balance?.toString() ?? null }, { status: 201 });
   } catch (error) {
     await logApplicationError(error, "POST /api/manage/keys");
     return NextResponse.json({ error: "Could not save the key. Check that the database is migrated and available." }, { status: 503 });

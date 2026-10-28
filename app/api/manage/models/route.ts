@@ -7,7 +7,11 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const models = await prisma.intelligenceModel.findMany({
-      include: { provider: { select: { id: true, name: true, code: true } } },
+      select: {
+        id: true, provider_id: true, model_name: true, cost_input: true, cost_output: true,
+        status: true, order_index: true, added_on: true,
+        provider: { select: { id: true, name: true, code: true } },
+      },
       orderBy: [{ order_index: "asc" }, { added_on: "desc" }],
     });
     return NextResponse.json(models.map((model) => ({ ...model, cost_input: model.cost_input.toString(), cost_output: model.cost_output.toString() })));
@@ -31,6 +35,7 @@ export async function POST(request: Request) {
   const data = body as Record<string, unknown>;
   const provider_id = Number(data.provider_id);
   const model_name = typeof data.model_name === "string" ? data.model_name.trim() : "";
+  const reqMethod = typeof data.reqMethod === "string" && data.reqMethod.trim() ? data.reqMethod : null;
   const status = typeof data.status === "string" ? data.status.trim() : "";
   const cost_input = typeof data.cost_input === "string" || typeof data.cost_input === "number" ? String(data.cost_input).trim() : "";
   const cost_output = typeof data.cost_output === "string" || typeof data.cost_output === "number" ? String(data.cost_output).trim() : "";
@@ -46,12 +51,17 @@ export async function POST(request: Request) {
       data: {
         provider_id,
         model_name,
+        reqMethod,
         cost_input,
         cost_output,
         status,
         order_index: (maximum._max.order_index ?? -1) + 1,
       },
-      include: { provider: { select: { id: true, name: true, code: true } } },
+      select: {
+        id: true, provider_id: true, model_name: true, cost_input: true, cost_output: true,
+        status: true, order_index: true, added_on: true,
+        provider: { select: { id: true, name: true, code: true } },
+      },
     });
     return NextResponse.json({ ...model, cost_input: model.cost_input.toString(), cost_output: model.cost_output.toString() }, { status: 201 });
   } catch (error) {

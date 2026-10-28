@@ -22,7 +22,7 @@ export default function ChatPage() {
       .then(async (response) => {
         if (!response.ok) return false;
         const saved = await response.json();
-        return Array.isArray(saved) && saved.some((entry) => Boolean(entry.model));
+        return Array.isArray(saved) && saved.length > 0;
       })
       .then(setProviderConfigured)
       .catch(() => setProviderConfigured(false));

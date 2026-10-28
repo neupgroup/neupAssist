@@ -11,6 +11,7 @@ export default function ManageProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [reqMethod, setReqMethod] = useState("");
   const [status, setStatus] = useState("active");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,12 +42,13 @@ export default function ManageProvidersPage() {
       const response = await fetch("/api/manage/providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, code, status }),
+        body: JSON.stringify({ name, code, status, reqMethod }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save provider.");
       setName("");
       setCode("");
+      setReqMethod("");
       await loadProviders();
       setMessage("Provider saved.");
     } catch (error) {
@@ -97,6 +99,8 @@ export default function ManageProvidersPage() {
             <div className="settings-panel-header"><div><h2>Add a provider</h2><p>Provider codes are used to identify services.</p></div><span className="access-icon"><Icon name="key" size={17} /></span></div>
             <label className="setting-field"><span>Name</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. OpenAI" required /></label>
             <label className="setting-field"><span>Code</span><Input value={code} onChange={(event) => setCode(event.target.value.toLowerCase().replace(/\s+/g, "-"))} placeholder="e.g. openai" pattern="[a-z0-9][a-z0-9_-]{1,49}" required /><small className="provider-code-hint">Letters, numbers, hyphens, and underscores.</small></label>
+            <label className="setting-field"><span>Request method <small>Optional default cURL template</small></span><textarea className="reqmethod-input" value={reqMethod} onChange={(event) => setReqMethod(event.target.value)} placeholder={'curl -X POST https://api.example.com/chat -H "Content-Type: application/json" -d \'{"model":"{{model}}","messages":{{input}}}\'\n---response---\n{"output":"{{output}}"}'} rows={8} /></label>
+            <p className="key-form-note"><Icon name="help" size={14} /> Supports {'{{model}}'}, {'{{provider}}'}, {'{{input}}'}, and {'{{apikey}}'}. The optional <code>---response---</code> section can specify the JSON response shape containing {'{{output}}'}.</p>
             <label className="setting-field"><span>Status</span><select className="settings-select key-provider" value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
             {message && <p className={`keys-message${message.includes("saved") || message.includes("updated") || message.includes("removed") ? " success" : ""}`} role="status">{message}</p>}
             <Button type="submit" variant="solid" className="full-button" disabled={saving}>{saving ? "Saving…" : <><Icon name="plus" size={16} /> Save provider</>}</Button>
