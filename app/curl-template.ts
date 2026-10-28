@@ -1,4 +1,17 @@
+import personaSections from "../services/request/persona.json";
+
 export const RESPONSE_FORMAT_SEPARATOR = "\n---response---\n";
+
+function resolvePersona(path = "") {
+  const sections = personaSections as Record<string, unknown>;
+  const names = path ? path.split(".") : [];
+  const values = [sections.default, ...names.map((name) => sections[name])];
+  if (values.some((value) => typeof value !== "string" || !value.trim())) {
+    const missing = names.find((name) => typeof sections[name] !== "string" || !(sections[name] as string).trim());
+    throw new Error(missing ? `Unknown persona section: ${missing}.` : "The default persona is missing or empty.");
+  }
+  return (values as string[]).join("\n\n");
+}
 
 function tokenizeCurl(command: string) {
   const tokens: string[] = [];
@@ -29,13 +42,15 @@ function tokenizeCurl(command: string) {
   return tokens;
 }
 
-export function renderCurlTemplate(template: string, values: { model: string; provider: string; input: string; apikey: string }) {
+export function renderCurlTemplate(template: string, values: { model: string; provider: string; input: string; chathistory: string; apikey: string }) {
   const tokens = tokenizeCurl(template).map((token) => token
     .replaceAll("{{modelcode}}", values.model)
     .replaceAll("{{model}}", values.model)
     .replaceAll("{{provider}}", values.provider)
     .replaceAll("{{input}}", values.input)
-    .replaceAll("{{apikey}}", values.apikey));
+    .replaceAll("{{chathistory}}", values.chathistory)
+    .replaceAll("{{apikey}}", values.apikey)
+    .replace(/\{\{persona(?:\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*))?\}\}/g, (_match, path: string | undefined) => resolvePersona(path)));
   if (tokens[0]?.toLowerCase() === "curl") tokens.shift();
   let url = "";
   let method = "GET";

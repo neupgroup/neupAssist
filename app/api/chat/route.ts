@@ -94,7 +94,8 @@ export async function POST(request: Request) {
     if (configuredRequest) {
       const [curlTemplate, ...responseFormatParts] = configuredRequest.split(RESPONSE_FORMAT_SEPARATOR);
       responseFormat = responseFormatParts.length ? responseFormatParts.join(RESPONSE_FORMAT_SEPARATOR).trim() : null;
-      const curl = renderCurlTemplate(curlTemplate, { model, provider: prioritized?.provider.code ?? explicit?.modelInfo?.provider.code ?? credential.provider, input: normalizedMessages.at(-1)?.content ?? "", apikey: credential.key });
+      const chatHistory = normalizedMessages.map((message) => `${message.role === "assistant" ? "Nia" : "user"}: ${message.content}`).join("\n");
+      const curl = renderCurlTemplate(curlTemplate, { model, provider: prioritized?.provider.code ?? explicit?.modelInfo?.provider.code ?? credential.provider, input: normalizedMessages.at(-1)?.content ?? "", chathistory: chatHistory, apikey: credential.key });
       if (!curlTemplate.includes("{{apikey}}") && !curl.headers.has("authorization") && !curl.headers.has("x-api-key") && !curl.headers.has("x-goog-api-key")) {
         if (provider === "anthropic") curl.headers.set("x-api-key", credential.key);
         else if (provider === "google") curl.headers.set("x-goog-api-key", credential.key);

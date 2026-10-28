@@ -52,6 +52,7 @@ export async function POST(request: Request, context: RouteContext) {
       model: model.code,
       provider: provider.code,
       input: "Hello World",
+      chathistory: "user: Hello World",
       apikey: secret,
     });
     if (!curlTemplate.includes("{{apikey}}") && !curl.headers.has("authorization") && !curl.headers.has("x-api-key") && !curl.headers.has("x-goog-api-key")) {
