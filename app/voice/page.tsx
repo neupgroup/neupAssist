@@ -4,17 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@neup/components/ui/button";
 import { Icon } from "../ui-icon";
 
-type RecognitionResult = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
-type Recognition = { lang: string; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
+type RecognitionResult = { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string; isFinal?: boolean }>> };
+type Recognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: RecognitionResult) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 
 export default function VoicePage() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
   const recognition = useRef<Recognition | null>(null);
   const orbRef = useRef<HTMLDivElement>(null);
+  const chatId = useRef<number | null>(null);
+  const transcriptRef = useRef("");
+  const sendingRef = useRef(false);
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const speech = window as SpeechWindow;
@@ -23,11 +29,28 @@ export default function VoicePage() {
     const instance = new RecognitionConstructor();
     instance.lang = "en-US";
     instance.interimResults = true;
-    instance.onresult = (event) => setTranscript(Array.from(event.results).map((result) => result[0].transcript).join(""));
-    instance.onend = () => setListening(false);
-    instance.onerror = () => setListening(false);
+    instance.continuous = true;
+    instance.onresult = (event) => {
+      const text = Array.from(event.results).map((result) => result[0].transcript).join("").trim();
+      transcriptRef.current = text;
+      setTranscript(text);
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      if (text) silenceTimer.current = setTimeout(() => instance.stop(), 1100);
+    };
+    instance.onend = () => {
+      setListening(false);
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      if (transcriptRef.current.trim()) void respond(transcriptRef.current);
+    };
+    instance.onerror = () => {
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      setListening(false);
+    };
     recognition.current = instance;
-    return () => { instance.stop(); };
+    return () => {
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
+      instance.stop();
+    };
   }, []);
 
   useEffect(() => {
@@ -107,16 +130,43 @@ export default function VoicePage() {
 
   function toggleListening() {
     if (listening) { recognition.current?.stop(); setListening(false); return; }
-    setTranscript(""); setReply("");
+    transcriptRef.current = "";
+    setTranscript(""); setReply(""); setError("");
     try { recognition.current?.start(); setListening(true); } catch { setListening(false); }
   }
 
-  function respond() {
-    if (!transcript.trim()) return;
-    const text = "I heard you. Connect an AI provider in Settings to have a full voice conversation with Nia.";
-    setReply(text);
-    if ("speechSynthesis" in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  async function respond(transcribedText: string) {
+    const content = transcribedText.trim();
+    if (!content || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setError("");
+    setReply("");
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: chatId.current ?? undefined,
+          messages: [{ role: "user", content }],
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Nia couldn’t complete that request.");
+      chatId.current = result.chatId;
+      setReply(result.reply);
+      window.dispatchEvent(new Event("chats-updated"));
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(result.reply));
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   }
 
-  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>Speak naturally. Nia is here to listen.</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state">{listening ? "Listening…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser"}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported}>{listening ? <><Icon name="micOff" size={17} /> Stop listening</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p><Button variant="tinted" size="sm" onClick={respond}><Icon name="volume" size={15} /> Respond</Button></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
+  return <section className="voice-page"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Voice assistant</strong></div><Button variant="plain" size="icon" aria-label="Voice settings" className="icon-button"><Icon name="settings" size={18} /></Button></header><div className="voice-content"><div className="voice-heading"><div className="voice-kicker"><Icon name="voice" size={15} /> NIA VOICE</div><h1>Talk it out.</h1><p>Speak naturally. Nia is here to listen.</p></div><div ref={orbRef} className={`voice-orb ${listening ? "is-listening" : ""}`}><div className="orb-ring ring-one" /><div className="orb-ring ring-two" /><div className="orb-core"><Icon name="sparkles" size={30} strokeWidth={1.5} /></div><div className="voice-wave"><i /><i /><i /><i /><i /><i /><i /></div></div><p className="voice-state">{listening ? "Listening…" : sending ? "Nia is thinking…" : supported ? "Ready when you are" : "Voice input isn’t supported in this browser"}</p><Button variant={listening ? "outlined" : "solid"} className="voice-toggle" onClick={toggleListening} disabled={!supported || sending}>{listening ? <><Icon name="micOff" size={17} /> Stop listening</> : <><Icon name="mic" size={17} /> Start speaking</>}</Button>{transcript && <div className="transcript-card"><span className="transcript-label">I HEARD</span><p>{transcript}</p></div>}{error && <div className="chat-error" role="alert"><p>{error}</p></div>}{reply && <div className="voice-reply"><span className="message-avatar"><Icon name="sparkles" size={14} /></span><p>{reply}</p></div>}<p className="voice-footnote">The orb grows and moves with your voice. Microphone audio stays in your browser.</p></div></section>;
 }
