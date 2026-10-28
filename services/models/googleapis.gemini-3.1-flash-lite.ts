@@ -1,7 +1,7 @@
 import type { ChatTurn } from "../request/chat";
 import instructions from "../request/instructions.json";
 import { logger } from "@neup/logica/logger";
-import { redactLogSecrets } from "../../app/server-logger";
+import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 
 export const modelId = "gemini-3.1-flash-lite";
 
@@ -55,10 +55,12 @@ export async function requestGeminiFlashLite({ apiKey, messages }: { apiKey: str
     const request = buildRequest(messages);
     const headers = new Headers(request.headers);
     headers.set("x-goog-api-key", apiKey);
+    const body = JSON.stringify(request.body);
+    await logAIRequest({ provider: "google", model: modelId, url: request.url, method: requestFormat.method, headers, body, apiKey });
     const response = await fetch(request.url, {
       method: requestFormat.method,
       headers,
-      body: JSON.stringify(request.body),
+      body,
       signal: AbortSignal.timeout(60_000),
     });
     const responseBody = await response.text();

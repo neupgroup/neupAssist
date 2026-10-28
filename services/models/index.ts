@@ -6,7 +6,7 @@ import instructions from "../request/instructions.json";
 import { compileChat, compileChatPrompt, type ChatTurn } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
 import { logger } from "@neup/logica/logger";
-import { redactLogSecrets } from "../../app/server-logger";
+import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 
 export type ModelMessage = ChatTurn;
 
@@ -81,6 +81,7 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
       }
     }
 
+    await logAIRequest({ provider: rawProvider, model, url, method, headers, body, apiKey });
     const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(60_000) });
     const responseBody = await response.text();
     try { await logger.type("ai-response").data({ provider: rawProvider, model, status: response.status, ok: response.ok, response: redactLogSecrets(responseBody, [apiKey]) }).log(); } catch { /* Logging must not interrupt provider response handling. */ }

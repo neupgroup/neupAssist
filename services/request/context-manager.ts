@@ -1,4 +1,6 @@
 import requests from "./context.json";
+import { getPersonalBasics } from "@/services/context/personal.basics";
+import { getPersonalNotifications } from "@/services/context/personal.notifications";
 
 type RequestCatalog = Record<string, string[]>;
 
@@ -14,16 +16,19 @@ export function isContextRequest(reply: string): ContextRequest | null {
   return knownRequests.has(normalized) ? normalized : null;
 }
 
-/** Collects app-owned data for a command. Integrations can be registered here as they are added. */
+/** Collects app-owned and authenticated account data for a context command. */
 export const contextManager = {
+  /** Builds the JSON context payload appended to the model conversation. */
   async collect(request: ContextRequest): Promise<Record<string, unknown>> {
     const scope = request === "--req--" ? [] : request.slice("--req.".length, -2).split(".");
     const data: Record<string, unknown> = { request, available: true };
 
     if (request === "--req--") {
+      const personalBasics = await getPersonalBasics();
       data.availableRequests = catalog.default.filter((command) => command !== "--req--");
       data.sampleData = {
-        profile: { name: "Alex Morgan", email: "alex.morgan@example.com", timezone: "Asia/Kathmandu" },
+        profile: personalBasics.profile,
+        profileAvailable: personalBasics.available,
         calendar: [
           { title: "Project planning", date: "2026-10-30", start: "10:00", end: "10:45" },
           { title: "Team check-in", date: "2026-10-30", start: "14:00", end: "14:30" },
@@ -35,10 +40,13 @@ export const contextManager = {
     }
 
     if (scope[0] === "personal") {
-      const profile = { name: "Alex Morgan", email: "alex.morgan@example.com", timezone: "Asia/Kathmandu" };
-      if (scope.length === 1 || scope.includes("bio")) data.profile = profile;
-      if (scope.length === 1 || scope.includes("settings") || scope.includes("preferences")) data.settings = { language: "English", timezone: profile.timezone, weekStartsOn: "Sunday", responseStyle: "Concise" };
-      if (scope.includes("notifications")) data.notifications = { email: true, reminders: true, productUpdates: false };
+      const personalBasics = scope.length === 1 || scope.includes("bio") ? await getPersonalBasics() : null;
+      if (personalBasics) {
+        data.profile = personalBasics.profile;
+        data.profileAvailable = personalBasics.available;
+      }
+      if (scope.length === 1 || scope.includes("settings") || scope.includes("preferences")) data.settings = { language: "English", weekStartsOn: "Sunday", responseStyle: "Concise" };
+      if (scope.includes("notifications")) data.notifications = await getPersonalNotifications();
       if (scope.includes("contacts")) data.contacts = [{ name: "Jordan Lee", relationship: "Colleague", email: "jordan.lee@example.com" }];
       if (scope.includes("calendar")) data.calendar = [{ title: "Project planning", date: "2026-10-30", start: "10:00", end: "10:45" }];
       if (scope.includes("tasks")) data.tasks = [{ title: "Review project proposal", due: "2026-10-30", status: "open" }];
