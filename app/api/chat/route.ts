@@ -16,9 +16,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
-  const messages = body && typeof body === "object" ? (body as { messages?: unknown }).messages : null;
+  const requestBody = body && typeof body === "object" ? body as { messages?: unknown; chatId?: unknown } : null;
+  const messages = requestBody?.messages;
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 100 || messages.some((message) => !message || typeof message !== "object" || !["user", "assistant"].includes((message as ChatMessage).role) || typeof (message as ChatMessage).content !== "string")) {
     return NextResponse.json({ error: "Send a conversation containing user and assistant messages." }, { status: 400 });
+  }
+  const requestedChatId = requestBody?.chatId;
+  if (requestedChatId !== undefined && (!Number.isInteger(requestedChatId) || (requestedChatId as number) < 1)) {
+    return NextResponse.json({ error: "Chat ID must be a positive integer." }, { status: 400 });
   }
 
   try {
@@ -163,7 +168,25 @@ export async function POST(request: Request) {
     } catch {
       // Logging failures must not affect the model response.
     }
-    return NextResponse.json({ reply: text.trim(), provider: credential.provider, model });
+    const latestUserMessage = [...normalizedMessages].reverse().find((message) => message.role === "user");
+    if (!latestUserMessage) {
+      return NextResponse.json({ error: "The conversation must include a user message." }, { status: 400 });
+    }
+    const title = latestUserMessage.content.trim().slice(0, 120) || "New chat";
+    const chatId = requestedChatId as number | undefined;
+    const savedChat = await prisma.$transaction(async (transaction) => {
+      const chat = chatId === undefined
+        ? await transaction.chat.create({ data: { title, status: "served" } })
+        : await transaction.chat.update({ where: { id: chatId }, data: { status: "served", lastUpdated: new Date() } });
+      await transaction.message.createMany({
+        data: [
+          { chat_id: chat.id, type: "userSent", content: latestUserMessage.content },
+          { chat_id: chat.id, type: "intelligenceReply", content: text.trim() },
+        ],
+      });
+      return chat;
+    });
+    return NextResponse.json({ reply: text.trim(), provider: credential.provider, model, chatId: savedChat.id });
   } catch (error) {
     await logApplicationError(error, "POST /api/chat");
     return NextResponse.json({ error: "Could not reach the configured AI provider. Check your saved key and try again." }, { status: 503 });

@@ -34,7 +34,7 @@ Table: chats, Model: Chat
 Fields:
 > id: int, auto incremental;
 > title: string;
-> account_id: int, references account.id;
+> account_id: int, nullable, references account.id;
 > status: enum(served, toserve, paused, completed), default: toserve;
 > lastUpdated: timestamp, automatically updated;
 

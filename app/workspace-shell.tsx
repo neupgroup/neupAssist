@@ -23,13 +23,16 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<SavedChat[]>([]);
 
   useEffect(() => {
-    fetch("/api/chats", { cache: "no-store" })
+    const loadChats = () => fetch("/api/chats", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
         const result = await response.json();
         if (Array.isArray(result)) setChats(result);
       })
       .catch(() => setChats([]));
+    void loadChats();
+    window.addEventListener("chats-updated", loadChats);
+    return () => window.removeEventListener("chats-updated", loadChats);
   }, []);
 
   return (

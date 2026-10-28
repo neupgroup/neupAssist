@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
 import { Textarea } from "@neup/components/ui/textarea";
 import { Icon } from "../ui-icon";
@@ -8,7 +9,10 @@ import { Icon } from "../ui-icon";
 type Message = { role: "user" | "assistant"; text: string };
 
 export default function ChatPage() {
+  const searchParams = useSearchParams();
+  const requestedChatId = searchParams.get("chatId");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chatId, setChatId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
@@ -16,6 +20,29 @@ export default function ChatPage() {
   const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setMessages([]);
+    setChatId(null);
+    if (!requestedChatId) return;
+    let cancelled = false;
+    fetch("/api/chats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId: requestedChatId }),
+      cache: "no-store",
+    }).then(async (response) => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not load saved chat.");
+      if (!cancelled) {
+        setChatId(result.id);
+        setMessages(result.messages);
+      }
+    }).catch((loadError) => {
+      if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load saved chat.");
+    });
+    return () => { cancelled = true; };
+  }, [requestedChatId]);
 
   useEffect(() => {
     fetch("/api/manage/keys", { cache: "no-store" })
@@ -43,7 +70,7 @@ export default function ChatPage() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: conversation.map(({ role, text: content }) => ({ role, content })) }),
+        body: JSON.stringify({ chatId: chatId ?? undefined, messages: conversation.map(({ role, text: content }) => ({ role, content })) }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -51,6 +78,8 @@ export default function ChatPage() {
         throw new Error(result.error || "Nia couldn’t complete that request.");
       }
       setMessages((current) => [...current, { role: "assistant", text: result.reply }]);
+      setChatId(result.chatId);
+      window.dispatchEvent(new Event("chats-updated"));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
     } finally {
