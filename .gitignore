@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+/prisma/client/generated/
+*.tsbuildinfo
+.env*
+!.env.example
+@neup/setup/
+
+certificates
+
+
+@neup

@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./client/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ChatStatus {
+  served
+  toserve
+  paused
+  completed
+}
+
+enum MessageType {
+  intelligenceReply
+  userSent
+  notification
+}
+
+model IntelligenceKey {
+  id        Int      @id @default(autoincrement())
+  provider  String
+  model     String?
+  key       String
+  addedOn   DateTime @default(now()) @db.Timestamp(3)
+  updatedOn DateTime @updatedAt @db.Timestamp(3)
+  balance   Decimal? @db.Decimal(20, 8)
+
+  @@map("intelligence_keys")
+}
+
+model IntelligenceModel {
+  id          Int      @id @default(autoincrement())
+  provider_id Int
+  provider    IntelligenceProvider @relation(fields: [provider_id], references: [id], onDelete: Restrict)
+  model_name  String
+  cost_input  Decimal  @db.Decimal(20, 8)
+  cost_output Decimal  @db.Decimal(20, 8)
+  status      String
+  order_index Int      @default(0)
+  added_on    DateTime @default(now()) @db.Timestamp(3)
+
+  @@index([order_index])
+  @@index([provider_id])
+  @@map("intelligence_models")
+}
+
+model IntelligenceProvider {
+  id         Int      @id @default(autoincrement())
+  name       String
+  code       String
+  created_on DateTime @default(now()) @db.Timestamp(3)
+  status     String
+  models     IntelligenceModel[]
+
+  @@map("intelligence_provider")
+}
+
+model Chat {
+  id          Int          @id @default(autoincrement())
+  title       String
+  account_id  Int
+  status      ChatStatus   @default(toserve)
+  lastUpdated DateTime     @updatedAt @db.Timestamp(3)
+  messages    Message[]
+
+  @@map("chats")
+}
+
+model Message {
+  id       Int         @id @default(autoincrement())
+  chat_id  Int
+  chat     Chat        @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  type     MessageType
+  content  String      @db.Text
+  sent_on  DateTime    @default(now()) @db.Timestamp(3)
+  /// References account.id; linked to the account model when it is added to this schema.
+  sent_by  Int?
+
+  @@index([chat_id, sent_on])
+  @@map("messages")
+}

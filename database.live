@@ -1,0 +1,45 @@
+Table: intelligence_keys, Model: IntelligenceKey
+Fields:
+> id: int, auto incremental;
+> provider: string;
+> model: string, nullable;
+> key: string;
+> addedOn: timestamp, default: current timestamp;
+> updatedOn: timestamp, automatically updated;
+> balance: decimal(20, 8), nullable;
+
+Table: intelligence_models, Model: IntelligenceModel
+Fields:
+> id: int, auto incremental;
+> provider_id: int, references intelligence_provider.id;
+> model_name: string;
+> cost_input: decimal(20, 8);
+> cost_output: decimal(20, 8);
+> status: string;
+> order_index: int, default: 0;
+> added_on: timestamp, default: current timestamp;
+
+Table: intelligence_provider, Model: IntelligenceProvider
+Fields:
+> id: int, auto incremental;
+> name: string;
+> code: string;
+> created_on: timestamp, default: current timestamp;
+> status: string;
+
+Table: chats, Model: Chat
+Fields:
+> id: int, auto incremental;
+> title: string;
+> account_id: int, references account.id;
+> status: enum(served, toserve, paused, completed), default: toserve;
+> lastUpdated: timestamp, automatically updated;
+
+Table: messages, Model: Message
+Fields:
+> id: int, auto incremental;
+> chat_id: int, references chats.id;
+> type: enum(intelligenceReply, userSent, notification);
+> content: text;
+> sent_on: timestamp, default: current timestamp;
+> sent_by: int, nullable, references account.id;
