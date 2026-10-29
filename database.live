@@ -8,11 +8,20 @@ Fields:
 > updatedOn: timestamp, automatically updated;
 > balance: decimal(20, 8), nullable;
 
+Table: accounts, Model: Account
+Fields:
+> id: string, primary key, supplied by NeupID;
+> type: string;
+> displayName: string;
+> displayImage: string, nullable;
+> neupId: string, nullable;
+> status: string;
+
 Table: chats, Model: Chat
 Fields:
 > id: int, auto incremental;
 > title: string;
-> account_id: int, nullable, references account.id;
+> account_id: string, nullable, references accounts.id;
 > status: enum(served, toserve, paused, completed), default: toserve;
 > lastUpdated: timestamp, automatically updated;
 
@@ -23,4 +32,4 @@ Fields:
 > type: enum(intelligenceReply, userSent, notification);
 > content: text;
 > sent_on: timestamp, default: current timestamp;
-> sent_by: int, nullable, references account.id;
+> sent_by: string, nullable, references accounts.id;

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
+import { getCookie } from "@neup/core/helpers/cookie";
 import { logApplicationError } from "../../server-logger";
+import { ensureAccount } from "../../../services/account";
 import { deleteChat, getChat, listChats } from "../../../services/chat";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  try { return NextResponse.json(await listChats()); }
+  try {
+    await ensureAccount(await getCookie("auth_account"));
+    return NextResponse.json(await listChats());
+  }
   catch (error) { await logApplicationError(error, "GET /api/chats"); return NextResponse.json({ error: "Could not load saved chats." }, { status: 503 }); }
 }
 

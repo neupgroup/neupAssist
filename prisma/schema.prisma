@@ -32,10 +32,24 @@ model IntelligenceKey {
   @@map("intelligence_keys")
 }
 
+model Account {
+  id           String  @id
+  type         String
+  displayName  String
+  displayImage String?
+  neupId       String?
+  status       String
+  chats        Chat[]
+  messages     Message[]
+
+  @@map("accounts")
+}
+
 model Chat {
   id          Int          @id @default(autoincrement())
   title       String
-  account_id  Int?
+  account_id  String?
+  account     Account?     @relation(fields: [account_id], references: [id], onDelete: SetNull)
   status      ChatStatus   @default(toserve)
   lastUpdated DateTime     @updatedAt @db.Timestamp(3)
   messages    Message[]
@@ -50,8 +64,8 @@ model Message {
   type     MessageType
   content  String      @db.Text
   sent_on  DateTime    @default(now()) @db.Timestamp(3)
-  /// References account.id; linked to the account model when it is added to this schema.
-  sent_by  Int?
+  sent_by  String?
+  sender   Account?    @relation(fields: [sent_by], references: [id], onDelete: SetNull)
 
   @@index([chat_id, sent_on])
   @@map("messages")
