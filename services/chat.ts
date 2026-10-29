@@ -88,7 +88,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {
-          const data = await executeContextTool({ name: toolCall.name, authAccountToken });
+          const data = await executeContextTool({ name: toolCall.name, authAccountToken, arguments: toolCall.arguments });
           const result = formatToolResult({ name: toolCall.name, data });
           toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
           return { id: toolCall.id, ...result };

@@ -4,18 +4,20 @@ import { personal_getNotifications, personal_getNotificationsDefinition } from "
 import { estate_getMyLeads, estate_getMyLeadsDefinition } from "./estate_getMyLeads";
 import { estate_getMyListings, estate_getMyListingsDefinition } from "./estate_getMyListings";
 import { estate_getFavourites, estate_getFavouritesDefinition } from "./estate_getFavourites";
+import { estate_getLeadActivity, estate_getLeadActivityDefinition } from "./estate_getLeadActivity";
+import { estate_postLeadActivity, estate_postLeadActivityDefinition } from "./estate_postLeadActivity";
 
 export type ToolDefinition = {
   name: string;
   description: string;
-  parameters: { type: "object"; properties: Record<string, never>; required: string[] };
+  parameters: { type: "object"; properties: Record<string, unknown>; required: string[] };
   format: string;
   guidelines: string;
 };
 
 export type ToolCall = { id: string; name: string; arguments: Record<string, unknown> };
 
-export type ToolExecutionContext = { authAccountToken?: string | null };
+export type ToolExecutionContext = { authAccountToken?: string | null; arguments?: Record<string, unknown> };
 
 /** Defines the tool discovery entry sent to models. */
 export const app_discoverToolsDefinition: ToolDefinition = {
@@ -41,6 +43,8 @@ export const contextTools: ToolDefinition[] = [
   estate_getMyLeadsDefinition,
   estate_getMyListingsDefinition,
   estate_getFavouritesDefinition,
+  estate_getLeadActivityDefinition,
+  estate_postLeadActivityDefinition,
 ];
 
 /** Ensures each model receives the tool-discovery declaration. */
@@ -66,8 +70,8 @@ export function formatToolResult({ name, data }: { name: string; data: unknown }
 }
 
 /** Runs one declared context tool using its existing service function. */
-export function executeContextTool({ name, authAccountToken }: { name: string; authAccountToken?: string | null }): Promise<unknown> {
-  const context: ToolExecutionContext = { authAccountToken };
+export function executeContextTool({ name, authAccountToken, arguments: toolArguments }: { name: string; authAccountToken?: string | null; arguments?: Record<string, unknown> }): Promise<unknown> {
+  const context: ToolExecutionContext = { authAccountToken, arguments: toolArguments };
   switch (name) {
     case "app_discoverTools": return Promise.resolve(discoverContextTools());
     case "personal_getBasics": return personal_getBasics(context);
@@ -75,6 +79,8 @@ export function executeContextTool({ name, authAccountToken }: { name: string; a
     case "estate_getMyLeads": return estate_getMyLeads(context);
     case "estate_getMyListings": return estate_getMyListings(context);
     case "estate_getFavourites": return estate_getFavourites(context);
+    case "estate_getLeadActivity": return estate_getLeadActivity(context);
+    case "estate_postLeadActivity": return estate_postLeadActivity(context);
     default: return Promise.reject(new Error(`Unknown context tool: ${name}`));
   }
 }
