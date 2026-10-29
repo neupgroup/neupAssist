@@ -49,7 +49,7 @@ export async function getPersonalLeads(authAccountToken?: string | null): Promis
       path: leadsEndpoint.path,
       method: leadsEndpoint.method,
       query,
-      headers: { "x-auth-account": accountToken },
+      headers: { "x-auth": accountToken },
     });
     if (!response.ok || response.body?.success === false) {
       await logPersonalLeads({

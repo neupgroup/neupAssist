@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { Writable } from "node:stream";
 import type { ChatMessage } from "../chat";
 import instructions from "../request/instructions.json";
 import { logger } from "@neup/logica/logger";
@@ -40,23 +41,28 @@ export function readNvidiaResponse(result: unknown): string | undefined {
   return typeof message?.content === "string" ? message.content : undefined;
 }
 
-/** Invokes curl with its request configuration supplied over standard input. */
+/** Sends curl options on a separate pipe and streams the JSON request body through stdin. */
 function invokeCurl({ url, headers, body }: { url: string; headers: Headers; body: string }): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const config = [
       `url = ${JSON.stringify(url)}`,
       'request = "POST"',
       ...Array.from(headers, ([name, value]) => `header = ${JSON.stringify(`${name}: ${value}`)}`),
-      `data-binary = ${JSON.stringify(body)}`,
-      "max-time = 60",
+      "max-time = 180",
     ].join("\n");
     const process = spawn("curl", [
-      "--config", "-", "--silent", "--show-error",
-      "--write-out", "\\n__NEUP_HTTP_STATUS__:%{http_code}",
-    ], { stdio: ["pipe", "pipe", "pipe"] });
+      "--config", "/dev/fd/3", "--silent", "--show-error", "--connect-timeout", "20",
+      "--no-buffer", "--data-binary", "@-", "--write-out", "\\n__NEUP_HTTP_STATUS__:%{http_code}",
+    ], { stdio: ["pipe", "pipe", "pipe", "pipe"] });
+    const configStream = process.stdio[3] as Writable | null;
+    if (!configStream) {
+      process.kill();
+      reject(new Error("curl configuration stream could not be opened."));
+      return;
+    }
+
     let stdout = "";
     let stderr = "";
-
     process.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
     process.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
     process.on("error", reject);
@@ -76,7 +82,8 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
       const status = Number(stdout.slice(markerIndex + statusMarker.length).trim());
       resolve({ status, body: stdout.slice(0, markerIndex).replace(/\\n$/, "") });
     });
-    process.stdin.end(config);
+    configStream.end(config);
+    process.stdin.end(body);
   });
 }
 
@@ -127,6 +134,17 @@ export async function requestNvidia({ model, apiKey, messages }: {
     const output = readNvidiaResponse(result);
     return output?.trim() ? { output: output.trim() } : { error: "The NVIDIA provider returned an empty response.", status: 502 };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "The NVIDIA request could not be completed.", status: 502 };
+    const message = error instanceof Error ? error.message : "The NVIDIA request could not be completed.";
+    try {
+      await logger.type("ai-request-error").data({
+        provider: "nvidia",
+        model,
+        transport: "curl",
+        error: redactLogSecrets(message, [apiKey]),
+      }).log();
+    } catch {
+      // Diagnostic logging must not affect provider fallback.
+    }
+    return { error: message, status: 502 };
   }
 }
