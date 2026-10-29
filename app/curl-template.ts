@@ -1,17 +1,6 @@
-import personaSections from "../services/request/instructions.json";
+import { resolvePromptSection } from "../services/request/prompts";
 
 export const RESPONSE_FORMAT_SEPARATOR = "\n---response---\n";
-
-function resolvePersona(path = "") {
-  const sections = personaSections as Record<string, unknown>;
-  const names = path ? path.split(".") : [];
-  const values = [sections.default, ...names.map((name) => sections[name])];
-  if (values.some((value) => typeof value !== "string" || !value.trim())) {
-    const missing = names.find((name) => typeof sections[name] !== "string" || !(sections[name] as string).trim());
-    throw new Error(missing ? `Unknown persona section: ${missing}.` : "The default persona is missing or empty.");
-  }
-  return (values as string[]).join("\n\n");
-}
 
 function tokenizeCurl(command: string) {
   const tokens: string[] = [];
@@ -71,7 +60,7 @@ export function renderCurlTemplate(template: string, values: { model: string; pr
     token = substitute(token, "{{input}}", values.input);
     token = substitute(token, "{{chathistory}}", values.chathistory);
     token = substitute(token, "{{apikey}}", values.apikey);
-    return token.replace(/\{\{persona(?:\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*))?\}\}/g, (_match, path: string | undefined) => resolvePersona(path));
+    return token.replace(/\{\{persona(?:\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*))?\}\}/g, (_match, path: string | undefined) => resolvePromptSection(path));
   });
   if (tokens[0]?.toLowerCase() === "curl") tokens.shift();
   let url = "";

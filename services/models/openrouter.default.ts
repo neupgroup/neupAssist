@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../chat";
-import instructions from "../request/instructions.json";
+import { buildSystemPrompt } from "../request/prompts";
 
 export const openRouterRequestFormat = {
   endpoint: "POST /api/v1/chat/completions",
@@ -33,7 +33,7 @@ export type OpenRouterRequestConfig = {
   systemInstruction?: string;
 };
 
-export function buildOpenRouterRequest({ model, messages, systemInstruction = instructions.default }: OpenRouterRequestConfig) {
+export function buildOpenRouterRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }) }: OpenRouterRequestConfig) {
   if (!supportsOpenRouterRequestModel(model)) throw new Error("OpenRouter model IDs must use the provider/model format, for example openai/gpt-4o.");
   return {
     url: "https://openrouter.ai/api/v1/chat/completions",

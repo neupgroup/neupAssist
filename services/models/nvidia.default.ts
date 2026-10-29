@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 import type { ChatMessage } from "../chat";
-import instructions from "../request/instructions.json";
+import prompts from "../request/prompts.json";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 import { modelId as nemotron35BoltE4BModel, requestNemotron35BoltE4B, supportsModel as supportsNemotron35BoltE4B } from "./nvidia.nemotron-3.5-bolt-e4b";
+import { contextTools, includeToolDiscovery, type ToolDefinition, type ToolCall } from "@/services/tools";
 
-export type NvidiaModelResponse = { output: string } | { error: string; status: number };
+export type NvidiaModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
 export const defaultNvidiaModel = nemotron35BoltE4BModel;
 
 export const nvidiaRequestFormat = {
@@ -19,15 +20,17 @@ export const nvidiaResponseFormat = {
 } as const;
 
 /** Builds the standard NVIDIA Integrate chat completion request. */
-export function buildNvidiaRequest({ model, messages }: { model: string; messages: ChatMessage[] }) {
+export function buildNvidiaRequest({ model, messages, tools = contextTools }: { model: string; messages: ChatMessage[]; tools?: ToolDefinition[] }) {
   return {
     url: "https://integrate.api.nvidia.com/v1/chat/completions",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: {
       model,
-      messages: [{ role: "system", content: instructions.default }, ...messages],
+      messages: [{ role: "system", content: prompts.persona }, ...messages],
       max_tokens: 2048,
       stream: false,
+      tools: includeToolDiscovery(tools).map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } })),
+      tool_choice: "auto",
     },
   };
 }
@@ -39,6 +42,22 @@ export function readNvidiaResponse(result: unknown): string | undefined {
   if (!Array.isArray(choices)) return undefined;
   const message = (choices[0] as { message?: { content?: unknown } } | undefined)?.message;
   return typeof message?.content === "string" ? message.content : undefined;
+}
+
+/** Reads NVIDIA's OpenAI-compatible function calls from a completion response. */
+export function readNvidiaToolCalls(result: unknown): ToolCall[] {
+  if (!result || typeof result !== "object") return [];
+  const choices = (result as { choices?: Array<{ message?: { tool_calls?: unknown[] } }> }).choices;
+  const calls = choices?.[0]?.message?.tool_calls;
+  if (!Array.isArray(calls)) return [];
+  return calls.flatMap((value, index) => {
+    if (!value || typeof value !== "object") return [];
+    const call = value as { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
+    if (typeof call.function?.name !== "string") return [];
+    let args: unknown = call.function.arguments;
+    if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
+    return [{ id: typeof call.id === "string" ? call.id : `nvidia-tool-${index}`, name: call.function.name, arguments: args && typeof args === "object" && !Array.isArray(args) ? args as Record<string, unknown> : {} }];
+  });
 }
 
 /** Sends curl options on a separate pipe and streams the JSON request body through stdin. */
@@ -131,8 +150,9 @@ export async function requestNvidia({ model, apiKey, messages }: {
       return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
     }
 
+    const toolCalls = readNvidiaToolCalls(result);
     const output = readNvidiaResponse(result);
-    return output?.trim() ? { output: output.trim() } : { error: "The NVIDIA provider returned an empty response.", status: 502 };
+    return toolCalls.length ? { output: output?.trim() ?? "", toolCalls } : output?.trim() ? { output: output.trim() } : { error: "The NVIDIA provider returned an empty response.", status: 502 };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The NVIDIA request could not be completed.";
     try {

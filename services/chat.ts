@@ -5,6 +5,7 @@ import { collectFormats, isFormatRequest } from "@/services/request/format-manag
 import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
+import { executeContextTool } from "@/services/tools";
 
 /** Lists the most recently updated chats. */
 export async function listChats() {
@@ -84,6 +85,21 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     provider = attempt.provider;
     model = attempt.model;
     text = attempt.result.output;
+    if (attempt.result.toolCalls?.length) {
+      const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
+        try {
+          const result = await executeContextTool({ name: toolCall.name, authAccountToken });
+          return { id: toolCall.id, name: toolCall.name, result };
+        } catch (error) {
+          return { id: toolCall.id, name: toolCall.name, error: error instanceof Error ? error.message : "The context tool failed." };
+        }
+      }));
+      requestMessages.push({ role: "assistant", content: text || "I’m checking the requested information." });
+      requestMessages.push({ role: "user", content: `Tool results:\n${JSON.stringify(toolResults)}` });
+      requestInstructions.push(...toolResults.map(({ name }) => `tool:${name}`));
+      if (turn === 5) text = "I couldn’t complete the information lookup after several requests. Please try asking in a different way.";
+      continue;
+    }
     const formatRequest = isFormatRequest(text);
     const contextRequest = isContextRequest(text);
     if (!formatRequest && !contextRequest) break;

@@ -3,11 +3,12 @@ import { requestGoogle } from "./google.default";
 import { requestNvidia } from "./nvidia.default";
 import { buildOpenAIRequest, readOpenAIResponse } from "./openai.default";
 import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.default";
-import instructions from "../request/instructions.json";
+import { buildSystemPrompt } from "../request/prompts";
 import { compileChat, compileChatPrompt, type ChatTurn } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
+import type { ToolCall } from "@/services/tools";
 
 export type ModelMessage = ChatTurn;
 
@@ -20,7 +21,7 @@ export type ModelRequest = {
 };
 
 export type ModelResponse =
-  | { output: string }
+  | { output: string; toolCalls?: ToolCall[] }
   | { error: string; status: number };
 
 function readGenericResponse(provider: string, result: any): string | undefined {
@@ -37,7 +38,8 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
   if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat });
   if (provider === "nvidia") return requestNvidia({ model, apiKey, messages });
   const chatHistory = compileChat(messages);
-  const prompt = compileChatPrompt(messages, instructions.default);
+  const defaultSystemPrompt = buildSystemPrompt({ includeTextContext: true });
+  const prompt = compileChatPrompt(messages, defaultSystemPrompt);
   let url: string;
   let method = "POST";
   let headers = new Headers({ "Content-Type": "application/json" });
@@ -76,7 +78,7 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
         url = "https://api.anthropic.com/v1/messages";
         headers.set("x-api-key", apiKey);
         headers.set("anthropic-version", "2023-06-01");
-        body = JSON.stringify({ model, max_tokens: 2048, system: instructions.default, messages: [{ role: "user", content: chatHistory }] });
+        body = JSON.stringify({ model, max_tokens: 2048, system: defaultSystemPrompt, messages: [{ role: "user", content: chatHistory }] });
       } else {
         url = provider === "mistral" ? "https://api.mistral.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
         headers.set("authorization", `Bearer ${apiKey}`);

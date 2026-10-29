@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../chat";
-import instructions from "../request/instructions.json";
+import { buildSystemPrompt } from "../request/prompts";
 
 export const openAIRequestFormat = {
   endpoint: "POST /v1/chat/completions",
@@ -33,7 +33,7 @@ export type OpenAIRequestConfig = {
   systemInstruction?: string;
 };
 
-export function buildOpenAIRequest({ model, messages, systemInstruction = instructions.default }: OpenAIRequestConfig) {
+export function buildOpenAIRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }) }: OpenAIRequestConfig) {
   if (!supportsOpenAIRequestModel(model)) throw new Error("OpenAI Chat Completions requests require an OpenAI model ID (for example gpt-4o).");
   return {
     url: "https://api.openai.com/v1/chat/completions",

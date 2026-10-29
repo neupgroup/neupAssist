@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 import type { ChatMessage } from "../chat";
-import instructions from "../request/instructions.json";
+import prompts from "../request/prompts.json";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
+import { contextTools, includeToolDiscovery, type ToolCall } from "@/services/tools";
 
 export const modelId = "nvidia/nemotron-3.5-bolt-e4b";
 const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -21,6 +22,8 @@ export const requestFormat = {
     seed: 42,
     stream: true,
     parallel_tool_calls: true,
+    tools: includeToolDiscovery(contextTools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
+    tool_choice: "auto",
     chat_template_kwargs: { enable_thinking: true },
   },
 } as const;
@@ -44,13 +47,15 @@ export function buildRequest(messages: ChatMessage[]) {
     },
     body: {
       model: modelId,
-      messages: [{ role: "system", content: instructions.default }, ...messages],
+      messages: [{ role: "system", content: prompts.persona }, ...messages],
       temperature: 1,
       top_p: 0.95,
       max_tokens: 1024,
       seed: 42,
       stream: true,
       parallel_tool_calls: true,
+      tools: includeToolDiscovery(contextTools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
+      tool_choice: "auto",
       chat_template_kwargs: { enable_thinking: true },
     },
   };
@@ -82,6 +87,33 @@ export function readResponse(responseBody: string): string | undefined {
   }
 
   return output.trim() || undefined;
+}
+
+/** Collects streamed function call fragments from NVIDIA completion events. */
+export function readToolCalls(responseBody: string): ToolCall[] {
+  const calls = new Map<number, { id: string; name: string; arguments: string }>();
+  for (const line of responseBody.split(/\r?\n/)) {
+    const data = line.startsWith("data:") ? line.slice(5).trim() : line.trim();
+    if (!data || data === "[DONE]") continue;
+    try {
+      const result = JSON.parse(data) as { choices?: Array<{ delta?: { tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> } }> };
+      for (const fragment of result.choices?.[0]?.delta?.tool_calls ?? []) {
+        const index = fragment.index ?? calls.size;
+        const call = calls.get(index) ?? { id: fragment.id ?? `nvidia-tool-${index}`, name: "", arguments: "" };
+        if (fragment.id) call.id = fragment.id;
+        call.name += fragment.function?.name ?? "";
+        call.arguments += fragment.function?.arguments ?? "";
+        calls.set(index, call);
+      }
+    } catch { /* Ignore incomplete SSE chunks. */ }
+  }
+  return [...calls.values()].flatMap(({ id, name, arguments: rawArguments }) => {
+    if (!name) return [];
+    try {
+      const args: unknown = JSON.parse(rawArguments || "{}");
+      return [{ id, name, arguments: args && typeof args === "object" && !Array.isArray(args) ? args as Record<string, unknown> : {} }];
+    } catch { return [{ id, name, arguments: {} }]; }
+  });
 }
 
 /** Sends curl options on a separate pipe and streams the JSON request body through stdin. */
@@ -134,7 +166,7 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
 export async function requestNemotron35BoltE4B({ apiKey, messages }: {
   apiKey: string;
   messages: ChatMessage[];
-}): Promise<{ output: string } | { error: string; status: number }> {
+}): Promise<{ output: string; toolCalls?: ToolCall[] } | { error: string; status: number }> {
   const request = buildRequest(messages);
   const headers = new Headers(request.headers);
   headers.set("authorization", `Bearer ${apiKey}`);
@@ -167,6 +199,8 @@ export async function requestNemotron35BoltE4B({ apiKey, messages }: {
       return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
     }
 
+    const toolCalls = readToolCalls(response.body);
+    if (toolCalls.length) return { output: readResponse(response.body) ?? "", toolCalls };
     const output = readResponse(response.body);
     return output ? { output } : { error: "The NVIDIA provider returned an empty response.", status: 502 };
   } catch (error) {

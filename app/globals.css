@@ -162,6 +162,13 @@
 .estate-lead-action:hover { background: #f6f9f5; }
 .estate-lead-action span { color: #879188; font-size: 14px; font-weight: 400; }
 .estate-lead-no-contact { margin: 0; padding: 12px; color: #7e8980; font-size: 14px; line-height: 1.55; }
+.estate-saved-property-card { display: flex; width: min(100%, 460px); align-items: center; gap: 12px; margin: 0 0 12px; padding: 10px; border: 1px solid #e6ebe4; border-radius: 11px; background: #fff; }
+.estate-saved-property-image, .estate-saved-property-placeholder { width: 76px; height: 68px; flex: 0 0 76px; border-radius: 8px; object-fit: cover; }
+.estate-saved-property-placeholder { display: grid; place-items: center; background: #edf3ec; color: #5d7c63; font-size: 24px; }
+.estate-saved-property-content { display: grid; min-width: 0; gap: 2px; }
+.estate-saved-property-content strong { color: #435046; font-size: 15px; font-weight: 600; }
+.estate-saved-property-price { color: #526e57; font-size: 14px; font-weight: 600; }
+.estate-saved-property-meta { color: #858f86; font-size: 14px; line-height: 1.4; }
 .chat-images { display: flex; flex-wrap: wrap; gap: 9px; margin: 10px 0; }
 .chat-image-link { display: block; max-width: min(100%, 420px); overflow: hidden; border: 1px solid #e5eae3; border-radius: 11px; background: #f7f9f6; }
 .chat-image { display: block; width: 100%; max-height: 360px; object-fit: contain; }

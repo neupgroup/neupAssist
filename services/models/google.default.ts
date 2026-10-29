@@ -1,12 +1,12 @@
 import type { ChatMessage } from "../chat";
-import instructions from "../request/instructions.json";
+import prompts from "../request/prompts.json";
 import { compileChat, compileChatPrompt } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
-import { requestGeminiFlashLite, supportsModel as supportsGeminiFlashLite } from "./googleapis.gemini-3.1-flash-lite";
+import { contextTools, includeToolDiscovery, type ToolCall } from "@/services/tools";
 
-export type GoogleModelResponse = { output: string } | { error: string; status: number };
+export type GoogleModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
 
 export const googleRequestFormat = {
   endpoint: "POST /v1beta/interactions",
@@ -45,7 +45,7 @@ export type GoogleRequestConfig = {
   systemInstruction?: string;
 };
 
-export function buildGoogleRequest({ model, messages, systemInstruction = instructions.default }: GoogleRequestConfig) {
+export function buildGoogleRequest({ model, messages, systemInstruction = prompts.persona }: GoogleRequestConfig) {
   if (!supportsGoogleRequestModel(model)) throw new Error("Google Interactions requests require a Gemini model ID (gemini-…).");
   return {
     url: "https://generativelanguage.googleapis.com/v1beta/interactions",
@@ -54,6 +54,7 @@ export function buildGoogleRequest({ model, messages, systemInstruction = instru
       model,
       system_instruction: systemInstruction,
       input: messages.map(({ role, content }) => (role === "assistant" ? "Assistant: " : "User: ") + content).join("\n\n"),
+      tools: includeToolDiscovery(contextTools).map(({ name, description, parameters }) => ({ type: "function", name, description, parameters })),
     },
   };
 }
@@ -65,18 +66,14 @@ export async function requestGoogle({ model, apiKey, messages, requestFormat }: 
   messages: ChatMessage[];
   requestFormat?: string | null;
 }): Promise<GoogleModelResponse> {
-  if (supportsGeminiFlashLite(model) && !requestFormat?.trim()) {
-    return requestGeminiFlashLite({ apiKey, messages });
-  }
-
+  const customFormat = requestFormat?.trim();
   const chatHistory = compileChat(messages);
-  const prompt = compileChatPrompt(messages, instructions.default);
+  const prompt = compileChatPrompt(messages, customFormat ? `${prompts.persona}\n\n${prompts.textcontext}` : prompts.persona);
   let url: string;
   let method = "POST";
   let headers = new Headers({ "Content-Type": "application/json" });
   let body: BodyInit | undefined;
   let responseFormat: string | null = null;
-  const customFormat = requestFormat?.trim();
 
   try {
     if (customFormat) {
@@ -107,9 +104,24 @@ export async function requestGoogle({ model, apiKey, messages, requestFormat }: 
       const detail = typeof result?.error?.message === "string" ? result.error.message : typeof result?.message === "string" ? result.message : responseBody.slice(0, 500) || "The provider request failed.";
       return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
     }
+    const toolCalls = readGoogleToolCalls(result);
     const output = responseFormat ? extractOutputByFormat(responseBody, responseFormat) : readGoogleResponse(result) ?? (customFormat ? responseBody : undefined);
-    return typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
+    return toolCalls.length ? { output: typeof output === "string" ? output.trim() : "", toolCalls } : typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "The Google request could not be completed.", status: 502 };
   }
+}
+
+/** Reads function_call steps returned by Gemini Interactions. */
+function readGoogleToolCalls(result: unknown): ToolCall[] {
+  if (!result || typeof result !== "object") return [];
+  const steps = (result as { steps?: unknown; output?: unknown }).steps ?? (result as { output?: unknown }).output;
+  if (!Array.isArray(steps)) return [];
+  return steps.flatMap((step, index) => {
+    if (!step || typeof step !== "object") return [];
+    const item = step as { type?: unknown; name?: unknown; id?: unknown; arguments?: unknown };
+    if (item.type !== "function_call" || typeof item.name !== "string") return [];
+    const args = item.arguments && typeof item.arguments === "object" && !Array.isArray(item.arguments) ? item.arguments as Record<string, unknown> : {};
+    return [{ id: typeof item.id === "string" ? item.id : `google-tool-${index}`, name: item.name, arguments: args }];
+  });
 }

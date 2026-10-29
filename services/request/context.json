@@ -9,6 +9,8 @@
     ],
     "--req.estate--": [
         "--req.estate.leads--",
-        "--req.estate.listings--"
+        "--req.estate.listings--",
+        "--req.estate.properties.favourites--",
+        "--req.estate.properties.saved--"
     ]
 }

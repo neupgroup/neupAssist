@@ -3,21 +3,26 @@ import { EstateBaseLead, type EstateLead } from "./estate.baselead";
 import { EstateMyLeads } from "./estate.myleads";
 import { EstateTeamLeads } from "./estate.teamleads";
 import { ChatImages } from "./image";
+import { EstateSavedProperty } from "./estate.savedproperty";
 
-type BlockType = "base" | "mine" | "team" | "image";
+type BlockType = "base" | "mine" | "team" | "savedProperty" | "image";
 type ChatBlock = { type: BlockType; content: string };
 
 /** Splits supported neup fenced blocks from the surrounding assistant text. */
 function splitChatBlocks(text: string): Array<string | ChatBlock> {
   const blocks: Array<string | ChatBlock> = [];
-  const pattern = /```\s*neup\.(estate\.leads?\.(base|myleads|teamleads)|image)(?:[ \t]*\n|[ \t]+)?([\s\S]*?)```|(\{\s*['\"]?id['\"]?\s*:[\s\S]*?\})/g;
+  const pattern = /```\s*neup\.(estate\.leads?\.(base|myleads|teamleads)|estate\.property\.saved|image)(?:[ \t]*\n|[ \t]+)?([\s\S]*?)```|(\{\s*['\"]?id['\"]?\s*:[\s\S]*?\})|(^|\n)\s*Property ID:\s*([^\s(]+)(?:\s*\(Saved on\s*([^)]+)\))?/g;
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     const start = match.index ?? 0;
     if (start > cursor) blocks.push(text.slice(cursor, start));
     const isLooseLead = Boolean(match[4]);
-    const type: BlockType = isLooseLead ? "base" : match[1] === "image" ? "image" : match[2] === "myleads" ? "mine" : match[2] === "teamleads" ? "team" : "base";
-    blocks.push({ type, content: isLooseLead ? match[4] : match[3] });
+    const isPlainSavedProperty = Boolean(match[6]);
+    const type: BlockType = isPlainSavedProperty ? "savedProperty" : isLooseLead ? "base" : match[1] === "image" ? "image" : match[1] === "estate.property.saved" ? "savedProperty" : match[2] === "myleads" ? "mine" : match[2] === "teamleads" ? "team" : "base";
+    const content = isPlainSavedProperty
+      ? JSON.stringify({ propertyId: match[6], savedAt: match[7] ?? null })
+      : isLooseLead ? match[4] : match[3];
+    blocks.push({ type, content });
     cursor = start + match[0].length;
   }
   if (cursor < text.length) blocks.push(text.slice(cursor));
@@ -72,6 +77,17 @@ function renderBlock(block: ChatBlock, key: number): ReactNode {
   if (block.type === "image") {
     const images = parseImages(block.content);
     return images.length ? <ChatImages key={key} images={images} /> : <p key={key}>{block.content}</p>;
+  }
+  if (block.type === "savedProperty") {
+    try {
+      const property: unknown = JSON.parse(block.content.trim());
+      if (property && typeof property === "object" && !Array.isArray(property)) {
+        return <EstateSavedProperty key={key} property={property as Record<string, unknown>} />;
+      }
+    } catch {
+      // Keep malformed property blocks visible as text below.
+    }
+    return <p key={key}>{block.content}</p>;
   }
   const lead = parseLead(block.content);
   if (!lead) return <p key={key}>{block.content}</p>;

@@ -1,8 +1,5 @@
 import requests from "./context.json";
-import { getPersonalBasics } from "@/services/context/personal.basics";
-import { getPersonalNotifications } from "@/services/context/personal.notifications";
-import { getPersonalLeads } from "@/services/context/personal.leads";
-import { getPersonalListings } from "@/services/context/personal.listings";
+import { executeContextTool } from "@/services/tools";
 import { logServiceRun } from "@/services/service-logger";
 
 type RequestCatalog = Record<string, string[]>;
@@ -39,19 +36,23 @@ export const contextManager = {
     }
 
     if (request === "--req.personal.basics--") {
-      return { request, available: true, ...(await getPersonalBasics(authAccountToken)) };
+      return { request, available: true, ...(await executeContextTool({ name: "get_personal_basics", authAccountToken }) as object) };
     }
 
     if (request === "--req.personal.notifications--") {
-      return { request, available: true, ...(await getPersonalNotifications(authAccountToken)) };
+      return { request, available: true, ...(await executeContextTool({ name: "get_personal_notifications", authAccountToken }) as object) };
     }
 
     if (request === "--req.estate.leads--") {
-      return { request, available: true, ...(await getPersonalLeads(authAccountToken)) };
+      return { request, available: true, ...(await executeContextTool({ name: "get_personal_leads", authAccountToken }) as object) };
     }
 
     if (request === "--req.estate.listings--") {
-      return { request, available: true, ...(await getPersonalListings(authAccountToken)) };
+      return { request, available: true, ...(await executeContextTool({ name: "get_personal_listings", authAccountToken }) as object) };
+    }
+
+    if (request === "--req.estate.properties.favourites--" || request === "--req.estate.properties.saved--") {
+      return { request, ...(await executeContextTool({ name: "get_personal_saved_properties", authAccountToken }) as object) };
     }
 
     return {
