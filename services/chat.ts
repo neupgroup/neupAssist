@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/prisma/client/server";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
+import { collectFormats, isFormatRequest } from "@/services/request/format-manager";
 import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
@@ -83,13 +84,20 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     provider = attempt.provider;
     model = attempt.model;
     text = attempt.result.output;
+    const formatRequest = isFormatRequest(text);
     const contextRequest = isContextRequest(text);
-    if (!contextRequest) break;
-    requestInstructions.push(contextRequest);
-    onContextRequest?.(contextRequest);
-    const context = await contextManager.collect(contextRequest, authAccountToken);
-    requestMessages.push({ role: "assistant", content: text });
-    requestMessages.push({ role: "user", content: `Context data for ${contextRequest}:\n${JSON.stringify(context)}` });
+    if (!formatRequest && !contextRequest) break;
+    if (formatRequest) {
+      requestInstructions.push(formatRequest);
+      requestMessages.push({ role: "assistant", content: text });
+      requestMessages.push({ role: "user", content: `Available chat formats:\n${JSON.stringify(collectFormats())}` });
+    } else if (contextRequest) {
+      requestInstructions.push(contextRequest);
+      onContextRequest?.(contextRequest);
+      const context = await contextManager.collect(contextRequest, authAccountToken);
+      requestMessages.push({ role: "assistant", content: text });
+      requestMessages.push({ role: "user", content: `Context data for ${contextRequest}:\n${JSON.stringify(context)}` });
+    }
     if (turn === 5) {
       text = "I couldn’t complete the information lookup after several requests. Please try asking in a different way.";
       break;

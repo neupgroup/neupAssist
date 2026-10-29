@@ -1,0 +1,5 @@
+{
+    "--format--": "When a response needs lead cards or image previews, request these formats first by replying with exactly --format-- and nothing else. After receiving this catalog, use the exact fenced block syntax below. Never return lead records as plain text or as unfenced objects. Output one lead block per lead. Include only fields that have values; id and name are required.",
+    "--format.image--": "For each image, use a neup.image fenced block containing a Markdown link: ```neup.image\n[image URL](image URL)\n```. Multiple images may be in one block, one link per line.",
+    "--format.estate.lead.base--": "For each lead, use this exact fenced block with a JSON object payload: ```neup.estate.lead.base\n{\"id\":\"leadId\",\"name\":\"leadName\",\"email\":\"leadEmail\",\"phone\":\"leadPhone\"}\n```. Omit optional keys when their values are unavailable; always include id and name. Do not add text inside the object outside its fields."
+}
