@@ -1,11 +1,14 @@
 {
-    "default": [
-        "--req--",
-        "--req.personal--"
-    ],
-    "personal": [
+    "--req--": [
         "--req.personal--",
+        "--req.estate--"
+    ],
+    "--req.personal--": [
         "--req.personal.basics--",
         "--req.personal.notifications--"
+    ],
+    "--req.estate--": [
+        "--req.estate.leads--",
+        "--req.estate.listings--"
     ]
 }

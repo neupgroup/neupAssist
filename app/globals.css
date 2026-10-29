@@ -309,8 +309,18 @@
 .saved-key-details { display: grid; min-width: 0; flex: 1; gap: 3px; }
 .saved-key-details strong { overflow: hidden; color: #4b584e; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .saved-key-details strong span { color: #7b887d; font-weight: 400; }
+.saved-key-link { color: inherit; text-decoration: none; }
+.saved-key-link:hover strong { color: #52785e; }
 .saved-key-details code { color: #818c83; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .saved-key-details small { color: #919a92; font-size: 12px; }
+.key-detail-card { max-width: 760px; }
+.key-detail-list { display: grid; margin: 18px 0 0; border-top: 1px solid #edf0ec; }
+.key-detail-list > div { display: grid; grid-template-columns: minmax(120px, .35fr) minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid #edf0ec; }
+.key-detail-list dt { color: #818b83; font-size: 13px; }
+.key-detail-list dd { margin: 0; color: #4b584e; font-size: 14px; overflow-wrap: anywhere; }
+.key-detail-list code { color: #818c83; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.key-detail-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.remove-detail-key { color: #a2564f !important; }
 .remove-key-button { width: 30px !important; height: 30px !important; flex: 0 0 30px; color: #929b93 !important; font-size: 21px !important; }
 .remove-key-button:hover { background: #fff0ee !important; color: #b3544d !important; }
 .key-security-note { display: flex; align-items: center; gap: 8px; margin-top: 15px; padding-top: 13px; border-top: 1px solid #edf0ec; color: #879188; font-size: 13px; }

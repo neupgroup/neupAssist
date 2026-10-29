@@ -1,7 +1,9 @@
 import "server-only";
 import { prisma } from "../prisma/client/server";
+import { logServiceRun } from "@/services/service-logger";
 
 export const listKeys = async () => {
+  await logServiceRun("manage.keys.list");
   const keys = await prisma.intelligenceKey.findMany({
     select: { id: true, provider: true, model: true, key: true, addedOn: true, updatedOn: true, balance: true },
     orderBy: { addedOn: "desc" },
@@ -14,13 +16,14 @@ export const listKeys = async () => {
 };
 
 export async function saveKey(data: Record<string, unknown>) {
+  await logServiceRun("manage.keys.save", { provider: typeof data.provider === "string" ? data.provider : null });
   const provider = typeof data.provider === "string" ? data.provider.trim() : "";
-  const model = typeof data.model === "string" ? data.model.trim() : "";
+  const model = typeof data.model === "string" ? data.model.trim() || null : null;
   const key = typeof data.key === "string" ? data.key.trim() : "";
   const uncapped = data.balance === null;
   const balance = typeof data.balance === "string" || typeof data.balance === "number" ? String(data.balance).trim() : "";
-  if (!provider || !model || !key || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
-    return { error: "Provider, model, key, and a valid balance (up to 8 decimal places) are required, or select Uncapped.", status: 400 } as const;
+  if (!provider || !key || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
+    return { error: "Provider, key, and a valid balance (up to 8 decimal places) are required, or select Uncapped.", status: 400 } as const;
   }
   const created = await prisma.intelligenceKey.create({
     data: { provider, model, key, balance: uncapped ? null : balance },
@@ -30,6 +33,7 @@ export async function saveKey(data: Record<string, unknown>) {
 }
 
 export const deleteKey = async (id: number) => {
+  await logServiceRun("manage.keys.delete", { id });
   await prisma.intelligenceKey.delete({ where: { id } });
   return { success: true };
 };

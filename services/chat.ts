@@ -2,37 +2,92 @@ import "server-only";
 import { prisma } from "@/prisma/client/server";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
 import { requestModel } from "@/services/models";
+import { defaultNvidiaModel } from "@/services/models/nvidia.default";
+import { logServiceRun } from "@/services/service-logger";
 
+/** Lists the most recently updated chats. */
 export async function listChats() {
+  await logServiceRun("chat.list");
   return prisma.chat.findMany({ select: { id: true, title: true, lastUpdated: true }, orderBy: { lastUpdated: "desc" }, take: 50 });
 }
 
+/** Loads a chat and converts stored messages to the conversation format. */
 export async function getChat(chatId: number) {
+  await logServiceRun("chat.get", { chatId });
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, messages: { orderBy: { sent_on: "asc" }, select: { type: true, content: true } } } });
   if (!chat) return null;
   return { id: chat.id, title: chat.title, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
-export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onContextRequest?: (request: string) => void) {
+
+type SavedCredential = {
+  provider: string;
+  model: string | null;
+  key: string;
+};
+
+type ResolvedCredential = SavedCredential & { model: string };
+
+/** Resolves provider defaults and returns at most one credential per provider. */
+function getFallbackCredentials(credentials: SavedCredential[]): ResolvedCredential[] {
+  const providers = new Set<string>();
+  const resolved: ResolvedCredential[] = [];
+
+  for (const credential of credentials) {
+    const provider = credential.provider.trim().toLowerCase();
+    const model = credential.model?.trim() || (provider === "nvidia" ? defaultNvidiaModel : "");
+    if (!provider || !model || providers.has(provider)) continue;
+    providers.add(provider);
+    resolved.push({ ...credential, model });
+    if (resolved.length === 5) break;
+  }
+
+  return resolved;
+}
+
+/** Tries saved providers in order and returns the first successful model response. */
+async function requestWithFallback(credentials: ResolvedCredential[], messages: ChatMessage[]) {
+  let lastFailure: { error: string; status: number } | null = null;
+
+  for (const credential of credentials) {
+    const provider = credential.provider.trim().toLowerCase();
+    const model = credential.model.trim();
+    const result = await requestModel({ provider, model, apiKey: credential.key, messages });
+    if (!("error" in result)) return { result, provider: credential.provider, model } as const;
+    lastFailure = result;
+  }
+
+  return {
+    result: lastFailure ?? { error: "No saved AI provider is available.", status: 409 },
+    provider: credentials[0]?.provider ?? "",
+    model: credentials[0]?.model ?? "",
+  } as const;
+}
+
+/** Sends a chat through saved providers, falling back across up to five providers. */
+export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onContextRequest?: (request: string) => void, authAccountToken?: string | null) {
+  await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null });
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model: true, key: true } });
-  const credential = credentials.find((entry) => Boolean(entry.provider.trim() && entry.model?.trim()));
-  if (!credential) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
-  const model = credential.model!;
-  const provider = credential.provider.toLowerCase();
+  const fallbackCredentials = getFallbackCredentials(credentials);
+  if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
   const requestMessages = [...messages];
   const requestInstructions: string[] = [];
   let text = "";
+  let provider = fallbackCredentials[0].provider;
+  let model = fallbackCredentials[0].model!;
   let chatId = requestedChatId;
   for (let turn = 0; turn < 6; turn += 1) {
-    const result = await requestModel({ provider, model, apiKey: credential.key, messages: requestMessages });
-    if ("error" in result) return { ...result, provider: credential.provider, model, key: credential.key } as const;
-    text = result.output;
+    const attempt = await requestWithFallback(fallbackCredentials, requestMessages);
+    if ("error" in attempt.result) return { ...attempt.result, provider: attempt.provider, model: attempt.model } as const;
+    provider = attempt.provider;
+    model = attempt.model;
+    text = attempt.result.output;
     const contextRequest = isContextRequest(text);
     if (!contextRequest) break;
     requestInstructions.push(contextRequest);
     onContextRequest?.(contextRequest);
-    const context = await contextManager.collect(contextRequest);
+    const context = await contextManager.collect(contextRequest, authAccountToken);
     requestMessages.push({ role: "assistant", content: text });
     requestMessages.push({ role: "user", content: `Context data for ${contextRequest}:\n${JSON.stringify(context)}` });
     if (turn === 5) {
@@ -51,5 +106,5 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     ] });
     return saved;
   });
-  return { reply: text, provider: credential.provider, model, chatId: chat.id, requests: requestInstructions } as const;
+  return { reply: text, provider, model, chatId: chat.id, requests: requestInstructions } as const;
 }

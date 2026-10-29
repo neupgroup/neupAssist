@@ -1,5 +1,6 @@
 import "server-only";
 import { requestGoogle } from "./google.default";
+import { requestNvidia } from "./nvidia.default";
 import { buildOpenAIRequest, readOpenAIResponse } from "./openai.default";
 import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.default";
 import instructions from "../request/instructions.json";
@@ -32,7 +33,9 @@ function readGenericResponse(provider: string, result: any): string | undefined 
 
 export async function requestModel({ provider: rawProvider, model, apiKey, messages, requestFormat }: ModelRequest): Promise<ModelResponse> {
   const provider = rawProvider.toLowerCase();
+  try { await logger.type("service-run").data({ service: "models.request", provider: rawProvider, model, messageCount: messages.length }).log(); } catch { /* Logging must not interrupt provider request handling. */ }
   if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat });
+  if (provider === "nvidia") return requestNvidia({ model, apiKey, messages });
   const chatHistory = compileChat(messages);
   const prompt = compileChatPrompt(messages, instructions.default);
   let url: string;

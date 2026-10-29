@@ -38,19 +38,19 @@ export async function POST(request: Request) {
 
   const data = body as Record<string, unknown>;
   const provider = typeof data.provider === "string" ? data.provider.trim() : "";
-  const model = typeof data.model === "string" ? data.model.trim() : "";
+  const model = typeof data.model === "string" ? data.model.trim() || null : null;
   const key = typeof data.key === "string" ? data.key.trim() : "";
   const uncapped = data.balance === null;
   const balance = typeof data.balance === "string" || typeof data.balance === "number" ? String(data.balance).trim() : "";
 
-  if (!provider || !model || !key || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
-    return NextResponse.json({ error: "Provider, model, key, and a valid balance (up to 8 decimal places) are required, or select Uncapped." }, { status: 400 });
+  if (!provider || !key || (!uncapped && (!balance || !/^\d+(\.\d{1,8})?$/.test(balance)))) {
+    return NextResponse.json({ error: "Provider, key, and a valid balance (up to 8 decimal places) are required, or select Uncapped." }, { status: 400 });
   }
 
   try {
     const created = await prisma.intelligenceKey.create({
       data: { provider, model, key, balance: uncapped ? null : balance },
-      select: { id: true, provider: true, model, addedOn: true, updatedOn: true, balance: true },
+      select: { id: true, provider: true, model: true, addedOn: true, updatedOn: true, balance: true },
     });
     return NextResponse.json({ ...created, balance: created.balance?.toString() ?? null }, { status: 201 });
   } catch (error) {
