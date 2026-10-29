@@ -7,11 +7,12 @@ import { Button } from "@neup/components/ui/button";
 import { Textarea } from "@neup/components/ui/textarea";
 import { Icon } from "../ui-icon";
 import { renderChatContent } from "@/components/chat/render";
+import VoiceAssistant from "@/components/voice/voice-assistant";
 
 type ToolFormatHint = { name: string; format: string; guidelines: string };
 type Message = { role: "user" | "assistant"; text: string; toolFormats?: ToolFormatHint[] };
 
-export default function ChatPage({ initialChatId }: { initialChatId?: number } = {}) {
+function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}) {
   const searchParams = useSearchParams();
   const requestedChatId = initialChatId ? String(initialChatId) : searchParams.get("chatId");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -105,7 +106,7 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
   }
 
   return <section className="chat-page">
-    <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Chat</strong></div><div className="topbar-actions">{chatId && <Button variant="outlined" onClick={() => window.location.assign(`/chats/${chatId}?mode=voice`)}><Icon name="voice" size={16} /> Voice</Button>}<span className="model-status">{providerConfigured === null ? "Checking AI model…" : providerConfigured ? "AI model connected" : "No AI model connected"}</span>{providerConfigured === false && <Button variant="plain" size="sm" onClick={() => window.location.assign("/manage/keys")}>Connect</Button>}<Button variant="plain" size="icon" aria-label="More chat options" className="icon-button"><Icon name="more" size={19} /></Button></div></header>
+    <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Chat</strong></div><div className="topbar-actions">{chatId && <Button variant="outlined" onClick={() => window.location.assign(`/chat/${chatId}?mode=voice`)}><Icon name="voice" size={16} /> Voice</Button>}<span className="model-status">{providerConfigured === null ? "Checking AI model…" : providerConfigured ? "AI model connected" : "No AI model connected"}</span>{providerConfigured === false && <Button variant="plain" size="sm" onClick={() => window.location.assign("/manage/keys")}>Connect</Button>}<Button variant="plain" size="icon" aria-label="More chat options" className="icon-button"><Icon name="more" size={19} /></Button></div></header>
     <div className="conversation-scroll">
       {messages.length === 0 ? <div className="chat-empty">
         <div className="greeting-icon"><Icon name="sparkles" size={21} /></div><p className="greeting-overline">YOUR PERSONAL ASSISTANT</p><h1>What can I help you<br className="desktop-break" /> with today?</h1><p className="greeting-copy">Ask anything, think something through, or get a little help with your day.</p>
@@ -122,7 +123,14 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
     </div>
     <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>
       <Textarea ref={inputRef} value={draft} onChange={(event) => { setDraft(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />
-      <div className="composer-footer"><div className="composer-tools"><Button type="button" variant="plain" size="icon" className="icon-button attach-button" aria-label="Attach a file"><Icon name="paperclip" size={17} /></Button><span className="composer-divider" /><span className="composer-hint">Nia can make mistakes. Check important info.</span></div><div className="composer-actions"><Button type="button" variant="plain" size="icon" className="icon-button voice-shortcut" aria-label="Open voice assistant" onClick={() => window.location.assign(chatId ? `/chats/${chatId}?mode=voice` : "/voice")}><Icon name="voice" size={17} /></Button><Button type="submit" variant="solid" size="icon" className="send-button" aria-label="Send message" disabled={!draft.trim() || sending}><Icon name="send" size={17} /></Button></div></div>
+      <div className="composer-footer"><div className="composer-tools"><Button type="button" variant="plain" size="icon" className="icon-button attach-button" aria-label="Attach a file"><Icon name="paperclip" size={17} /></Button><span className="composer-divider" /><span className="composer-hint">Nia can make mistakes. Check important info.</span></div><div className="composer-actions"><Button type="button" variant="plain" size="icon" className="icon-button voice-shortcut" aria-label="Open voice assistant" onClick={() => window.location.assign(chatId ? `/chat/${chatId}?mode=voice` : "/chat?mode=voice")}><Icon name="voice" size={17} /></Button><Button type="submit" variant="solid" size="icon" className="send-button" aria-label="Send message" disabled={!draft.trim() || sending}><Icon name="send" size={17} /></Button></div></div>
     </form><div className="composer-caption">Nia · Personal assistant</div></div>
   </section>;
+}
+
+/** Selects voice mode or the regular chat view from the current chat URL. */
+export default function ChatPage({ initialChatId }: { initialChatId?: number } = {}) {
+  const searchParams = useSearchParams();
+  if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
+  return <ChatConversationPage initialChatId={initialChatId} />;
 }
