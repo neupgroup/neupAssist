@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logApplicationError } from "../../server-logger";
-import { getChat, listChats } from "../../../services/chat";
+import { deleteChat, getChat, listChats } from "../../../services/chat";
 
 export const runtime = "nodejs";
 
@@ -17,4 +17,13 @@ export async function POST(request: Request) {
     const chat = await getChat(chatId);
     return chat ? NextResponse.json(chat) : NextResponse.json({ error: "Saved chat was not found." }, { status: 404 });
   } catch (error) { await logApplicationError(error, "POST /api/chats"); return NextResponse.json({ error: "Could not load saved chat." }, { status: 503 }); }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const chatId = Number(new URL(request.url).searchParams.get("id"));
+    if (!Number.isInteger(chatId) || chatId < 1) return NextResponse.json({ error: "Chat ID must be a positive integer." }, { status: 400 });
+    const deleted = await deleteChat(chatId);
+    return deleted ? NextResponse.json({ id: chatId }) : NextResponse.json({ error: "Saved chat was not found." }, { status: 404 });
+  } catch (error) { await logApplicationError(error, "DELETE /api/chats"); return NextResponse.json({ error: "Could not delete saved chat." }, { status: 503 }); }
 }

@@ -19,6 +19,7 @@ type SavedChat = { id: number; title: string; lastUpdated: string };
 export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [chats, setChats] = useState<SavedChat[]>([]);
+  const [chatActionError, setChatActionError] = useState("");
 
   useEffect(() => {
     const loadChats = () => chatClientService.list()
@@ -32,6 +33,23 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("chats-updated", loadChats);
     return () => window.removeEventListener("chats-updated", loadChats);
   }, []);
+
+  /** Deletes a saved conversation and returns to chat if it is open. */
+  async function removeChat(chat: SavedChat) {
+    const title = chat.title || "Untitled chat";
+    if (!window.confirm(`Delete “${title}”? This will permanently delete the conversation.`)) return;
+    setChatActionError("");
+    try {
+      const response = await chatClientService.remove(chat.id);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not delete this chat.");
+      setChats((current) => current.filter((entry) => entry.id !== chat.id));
+      window.dispatchEvent(new Event("chats-updated"));
+      if (pathname === `/chat/${chat.id}`) window.location.assign("/chat");
+    } catch (error) {
+      setChatActionError(error instanceof Error ? error.message : "Could not delete this chat.");
+    }
+  }
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background">
@@ -51,7 +69,8 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mx-[3px] mb-2 ml-[9px] mt-[31px] flex items-center justify-between max-[600px]:hidden"><span className="text-[10px] font-semibold uppercase tracking-[.11em] text-[#919992]">Recent</span><Button variant="plain" size="icon" aria-label="Search chats" className="icon-button !h-7 !w-7"><Icon name="search" size={15} /></Button></div>
-        <div className="grid gap-px max-[600px]:hidden" aria-label="Saved chats">{chats.length ? chats.map((chat) => <Link key={chat.id} href={`/chat/${chat.id}`} className="overflow-hidden rounded-[7px] px-[10px] py-[9px] text-[13px] text-[#778079] transition-colors hover:bg-[#f0f2ee] hover:text-[#46524a]">{chat.title || "Untitled chat"}</Link>) : <span className="px-[10px] py-2 text-[13px] text-[#9aa29b]">No saved chats yet</span>}</div>
+        <div className="grid gap-px max-[600px]:hidden" aria-label="Saved chats">{chats.length ? chats.map((chat) => <div key={chat.id} className="group flex min-w-0 items-center rounded-[7px] transition-colors hover:bg-[#f0f2ee]"><Link href={`/chat/${chat.id}`} className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap px-[10px] py-[9px] text-[13px] text-[#778079] hover:text-[#46524a]">{chat.title || "Untitled chat"}</Link><button type="button" className="mr-1 grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-[#929b93] opacity-0 transition-opacity hover:bg-[#fff0ee] hover:text-[#b3544d] focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100" aria-label={`Delete ${chat.title || "Untitled chat"}`} title="Delete chat" onClick={() => void removeChat(chat)}><Icon name="trash" size={15} /></button></div>) : <span className="px-[10px] py-2 text-[13px] text-[#9aa29b]">No saved chats yet</span>}</div>
+        {chatActionError && <p className="mx-[9px] mt-2 text-xs text-[#a2564f]" role="alert">{chatActionError}</p>}
 
         <div className="mt-auto grid gap-[10px] max-[600px]:hidden">
           <div className="flex items-center gap-[9px] rounded-[10px] border border-[#e7eae4] bg-[#fffefa] px-[10px] py-[11px]"><span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-[9px] bg-[#edf3ec] text-[#52785c]"><Icon name="sparkles" size={15} /></span><div className="grid min-w-0 gap-[2px]"><strong className="text-[13px] font-semibold text-[#37423a]">Nia Personal</strong><span className="text-[12px] text-[#909891]">Personal assistant workspace</span></div><span className="ml-auto inline-block h-[6px] w-[6px] shrink-0 rounded-full bg-[#6eaa79] shadow-[0_0_0_3px_#6eaa791b]" /></div>

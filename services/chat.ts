@@ -20,6 +20,13 @@ export async function getChat(chatId: number) {
   return { id: chat.id, title: chat.title, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
+/** Deletes a saved chat and its related messages. */
+export async function deleteChat(chatId: number) {
+  await logServiceRun("chat.delete", { chatId });
+  const result = await prisma.chat.deleteMany({ where: { id: chatId } });
+  return result.count > 0;
+}
+
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type SavedCredential = {

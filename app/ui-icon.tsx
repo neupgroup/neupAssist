@@ -1,6 +1,6 @@
 import type { ReactNode, SVGProps } from "react";
 
-export type IconName = "sparkles" | "chat" | "voice" | "code" | "plus" | "search" | "settings" | "panel" | "more" | "paperclip" | "send" | "copy" | "like" | "dislike" | "mic" | "micOff" | "volume" | "key" | "external" | "help" | "check" | "arrow";
+export type IconName = "sparkles" | "chat" | "voice" | "code" | "plus" | "search" | "settings" | "panel" | "more" | "paperclip" | "send" | "copy" | "like" | "dislike" | "mic" | "micOff" | "volume" | "key" | "external" | "help" | "check" | "arrow" | "trash";
 
 const paths: Record<IconName, ReactNode> = {
   sparkles: <><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z"/><path d="m19 14 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14Z"/><path d="m5 3 .7 1.8L7.5 5.5l-1.8.7L5 8l-.7-1.8-1.8-.7 1.8-.7L5 3Z"/></>,
@@ -25,6 +25,7 @@ const paths: Record<IconName, ReactNode> = {
   help: <><circle cx="12" cy="12" r="10"/><path d="M9.6 9a2.5 2.5 0 1 1 4.5 1.5c-1.1 1.1-2.1 1.4-2.1 3m0 3h.01"/></>,
   check: <path d="m5 12 4 4L19 6"/>,
   arrow: <><path d="M7 17 17 7M7 7h10v10"/></>,
+  trash: <><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></>,
 };
 
 export function Icon({ name, size = 18, strokeWidth = 1.8, ...props }: SVGProps<SVGSVGElement> & { name: IconName; size?: number; strokeWidth?: number }) {
