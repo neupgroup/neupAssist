@@ -150,6 +150,19 @@
 .estate-lead-content strong { color: #435046; font-size: 15px; font-weight: 600; }
 .estate-lead-meta { color: #858f86; font-size: 14px; line-height: 1.4; }
 .estate-lead-remarks { margin-top: 2px; color: #67736a; font-size: 14px; line-height: 1.5; }
+.estate-activity-confirmation { display: flex; width: min(100%, 460px); align-items: flex-start; gap: 12px; margin: 10px 0 12px; padding: 13px; border: 1px solid #dce9dc; border-radius: 12px; background: linear-gradient(120deg, #fff 0%, #f7fbf6 100%); box-shadow: 0 5px 18px rgb(54 91 59 / 6%); animation: estate-activity-card-in .42s cubic-bezier(.2,.75,.25,1) both; }
+.estate-activity-check { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; overflow: hidden; border-radius: 50%; background: #e5f2e5; color: #47794d; animation: estate-activity-check-pop .38s .12s cubic-bezier(.2,1.6,.4,1) both; }
+.estate-activity-check svg { width: 21px; height: 21px; }
+.estate-activity-check path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: estate-activity-tick .42s .32s ease-out forwards; }
+.estate-activity-content { display: grid; min-width: 0; gap: 5px; }
+.estate-activity-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: #67736a; font-size: 14px; }
+.estate-activity-heading strong { color: #435046; font-weight: 600; }
+.estate-activity-remarks { color: #67736a; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.estate-activity-meta { color: #858f86; font-size: 12px; line-height: 1.4; }
+@keyframes estate-activity-card-in { from { opacity: 0; transform: translateY(9px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes estate-activity-check-pop { from { opacity: 0; transform: scale(.55) rotate(-16deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes estate-activity-tick { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .estate-activity-confirmation, .estate-activity-check { animation: none; } .estate-activity-check path { stroke-dashoffset: 0; animation: none; } }
 .estate-lead-dialog-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(24 34 27 / 38%); }
 .estate-lead-dialog { position: relative; width: min(100%, 420px); padding: 23px; border: 1px solid #e5ebe3; border-radius: 16px; background: #fff; box-shadow: 0 20px 70px rgb(23 36 27 / 22%); }
 .estate-lead-dialog-close { position: absolute; top: 10px; right: 12px; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #778178; font-size: 24px; cursor: pointer; }

@@ -19,8 +19,8 @@ export const estate_postLeadActivityDefinition: ToolDefinition = {
     },
     required: ["leadId", "activityType", "remarks"],
   },
-  format: "```neup.estate.activity.confirmation\n{\"leadId\":\"leadId\",\"activityType\":\"activityType\",\"followUpMethod\":\"followUpMethod\",\"remarks\":\"remarks\",\"activityOn\":\"activityOn\"}\n```",
-  guidelines: "After the service confirms success, return the created activity details in this format: {{format}}. Include only fields present in the created activity. Do not emit this block if the request failed.",
+  format: "```neup.estate.activity.confirmation\n{\"leadName\":\"leadName\",\"activityType\":\"activityType\",\"remarks\":\"remarks\",\"activityOn\":\"activityOn\"}\n```",
+  guidelines: "After the service confirms success, return the lead name, activity type, remarks, and activity date in this format: {{format}}. Do not include the lead ID, phone, or other contact details. Include only fields present in the created activity. Do not emit this block if the request failed.",
 };
 
 /** Posts a validated activity to one estate lead. */

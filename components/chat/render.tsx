@@ -4,8 +4,9 @@ import { EstateMyLeads } from "./estate.myleads";
 import { EstateTeamLeads } from "./estate.teamleads";
 import { ChatImages } from "./image";
 import { EstateSavedProperty } from "./estate.savedproperty";
+import { EstateActivityConfirmation, type EstateActivity } from "./estate.activity-confirmation";
 
-type BlockType = "base" | "mine" | "team" | "savedProperty" | "image";
+type BlockType = "base" | "mine" | "team" | "savedProperty" | "activityConfirmation" | "image";
 type ChatBlock = { type: BlockType; content: string };
 type ToolFormatHint = { format: string };
 
@@ -15,7 +16,7 @@ function splitChatBlocks(text: string, toolFormats: ToolFormatHint[] = []): Arra
   const declaredFormats = toolFormats.length
     ? new Set(toolFormats.flatMap(({ format }) => Array.from(format.matchAll(/```(neup\.[a-zA-Z0-9_.-]+)/g), (match) => match[1])))
     : null;
-  const pattern = /```\s*neup\.(estate\.leads?\.(base|myleads|teamleads)|estate\.property\.saved|image)(?:[ \t]*\n|[ \t]+)?([\s\S]*?)```|(\{\s*['\"]?id['\"]?\s*:[\s\S]*?\})|(^|\n)\s*Property ID:\s*([^\s(]+)(?:\s*\(Saved on\s*([^)]+)\))?/g;
+  const pattern = /```\s*neup\.(estate\.leads?\.(base|myleads|teamleads)|estate\.property\.saved|estate\.activity\.confirmation|image)(?:[ \t]*\n|[ \t]+)?([\s\S]*?)```|(\{\s*['\"]?id['\"]?\s*:[\s\S]*?\})|(^|\n)\s*Property ID:\s*([^\s(]+)(?:\s*\(Saved on\s*([^)]+)\))?/g;
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     const start = match.index ?? 0;
@@ -24,7 +25,7 @@ function splitChatBlocks(text: string, toolFormats: ToolFormatHint[] = []): Arra
     if (start > cursor) blocks.push(text.slice(cursor, start));
     const isLooseLead = Boolean(match[4]);
     const isPlainSavedProperty = Boolean(match[6]);
-    const type: BlockType = isPlainSavedProperty ? "savedProperty" : isLooseLead ? "base" : match[1] === "image" ? "image" : match[1] === "estate.property.saved" ? "savedProperty" : match[2] === "myleads" ? "mine" : match[2] === "teamleads" ? "team" : "base";
+    const type: BlockType = isPlainSavedProperty ? "savedProperty" : isLooseLead ? "base" : match[1] === "image" ? "image" : match[1] === "estate.property.saved" ? "savedProperty" : match[1] === "estate.activity.confirmation" ? "activityConfirmation" : match[2] === "myleads" ? "mine" : match[2] === "teamleads" ? "team" : "base";
     const content = isPlainSavedProperty
       ? JSON.stringify({ propertyId: match[6], savedAt: match[7] ?? null })
       : isLooseLead ? match[4] : match[3];
@@ -95,6 +96,27 @@ function renderBlock(block: ChatBlock, key: number): ReactNode {
     }
     return <p key={key}>{block.content}</p>;
   }
+  if (block.type === "activityConfirmation") {
+    try {
+      const activity: unknown = JSON.parse(block.content.trim());
+      if (activity && typeof activity === "object" && !Array.isArray(activity)) {
+        const record = activity as Record<string, unknown>;
+        if (typeof record.activityType === "string" && typeof record.remarks === "string") {
+          const confirmation: EstateActivity = {
+            leadName: typeof record.leadName === "string" ? record.leadName : null,
+            activityType: record.activityType,
+            remarks: record.remarks,
+            activityOn: typeof record.activityOn === "string" ? record.activityOn : null,
+            followUpMethod: typeof record.followUpMethod === "string" ? record.followUpMethod : null,
+          };
+          return <EstateActivityConfirmation key={key} activity={confirmation} />;
+        }
+      }
+    } catch {
+      // Keep malformed confirmation data visible as text below.
+    }
+    return <p key={key}>{block.content}</p>;
+  }
   const lead = parseLead(block.content);
   if (!lead) return <p key={key}>{block.content}</p>;
   if (block.type === "mine") return <EstateMyLeads key={key} leads={[lead]} />;
@@ -102,7 +124,7 @@ function renderBlock(block: ChatBlock, key: number): ReactNode {
   return <EstateBaseLead key={key} lead={lead} />;
 }
 
-/** Renders chat text with supported estate lead and image blocks as UI elements. */
+/** Renders chat text with supported estate, activity, and image blocks as UI elements. */
 export function renderChatContent(text: string, toolFormats: ToolFormatHint[] = []): ReactNode[] {
   return splitChatBlocks(text, toolFormats).map((part, index) => typeof part === "string"
     ? part.trim() ? <p key={index}>{part}</p> : null
