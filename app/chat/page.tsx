@@ -8,7 +8,8 @@ import { Textarea } from "@neup/components/ui/textarea";
 import { Icon } from "../ui-icon";
 import { renderChatContent } from "@/components/chat/render";
 
-type Message = { role: "user" | "assistant"; text: string };
+type ToolFormatHint = { name: string; format: string; guidelines: string };
+type Message = { role: "user" | "assistant"; text: string; toolFormats?: ToolFormatHint[] };
 
 export default function ChatPage({ initialChatId }: { initialChatId?: number } = {}) {
   const searchParams = useSearchParams();
@@ -94,7 +95,7 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
       }
       if (!result) throw new Error("Nia couldn’t complete that request.");
       setChatId(result.chatId as number);
-      setMessages((current) => [...current, { role: "assistant", text: result.reply as string }]);
+      setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
       window.dispatchEvent(new Event("chats-updated"));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
@@ -116,7 +117,7 @@ export default function ChatPage({ initialChatId }: { initialChatId?: number } =
         </div>
       </div> : <div className="message-list">{messages.map((message, index) => <article className={`message message-${message.role}`} key={`${index}-${message.role}`}>
         {message.role === "assistant" ? <span className="message-avatar"><Icon name="sparkles" size={20} /></span> : <span className="user-message-label">You</span>}
-        <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text) : <p>{message.text}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
+        <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{message.text}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
       </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={20} /></span><div className="message-body"><p key={`${requestProgress}-${requestDetails?.app ?? ""}`} className={requestProgress ? "request-status" : ""} aria-live="polite">{requestProgress === 0 ? "Nia is thinking…" : requestProgress === 1 ? `Nia is collecting information from ${requestDetails?.app ?? "your connected apps"} to respond to you.` : `Nia is collecting ${requestDetails?.items ?? "information"} from ${requestDetails?.app ?? "your connected apps"} to respond to you.`}</p></div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
     </div>
     <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>

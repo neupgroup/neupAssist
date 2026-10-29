@@ -7,14 +7,20 @@ import { EstateSavedProperty } from "./estate.savedproperty";
 
 type BlockType = "base" | "mine" | "team" | "savedProperty" | "image";
 type ChatBlock = { type: BlockType; content: string };
+type ToolFormatHint = { format: string };
 
 /** Splits supported neup fenced blocks from the surrounding assistant text. */
-function splitChatBlocks(text: string): Array<string | ChatBlock> {
+function splitChatBlocks(text: string, toolFormats: ToolFormatHint[] = []): Array<string | ChatBlock> {
   const blocks: Array<string | ChatBlock> = [];
+  const declaredFormats = toolFormats.length
+    ? new Set(toolFormats.flatMap(({ format }) => Array.from(format.matchAll(/```(neup\.[a-zA-Z0-9_.-]+)/g), (match) => match[1])))
+    : null;
   const pattern = /```\s*neup\.(estate\.leads?\.(base|myleads|teamleads)|estate\.property\.saved|image)(?:[ \t]*\n|[ \t]+)?([\s\S]*?)```|(\{\s*['\"]?id['\"]?\s*:[\s\S]*?\})|(^|\n)\s*Property ID:\s*([^\s(]+)(?:\s*\(Saved on\s*([^)]+)\))?/g;
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     const start = match.index ?? 0;
+    const formatName = match[1] ? `neup.${match[1]}` : null;
+    if (declaredFormats && formatName && !declaredFormats.has(formatName)) continue;
     if (start > cursor) blocks.push(text.slice(cursor, start));
     const isLooseLead = Boolean(match[4]);
     const isPlainSavedProperty = Boolean(match[6]);
@@ -97,8 +103,8 @@ function renderBlock(block: ChatBlock, key: number): ReactNode {
 }
 
 /** Renders chat text with supported estate lead and image blocks as UI elements. */
-export function renderChatContent(text: string): ReactNode[] {
-  return splitChatBlocks(text).map((part, index) => typeof part === "string"
+export function renderChatContent(text: string, toolFormats: ToolFormatHint[] = []): ReactNode[] {
+  return splitChatBlocks(text, toolFormats).map((part, index) => typeof part === "string"
     ? part.trim() ? <p key={index}>{part}</p> : null
     : renderBlock(part, index)).filter((part): part is ReactNode => part !== null);
 }

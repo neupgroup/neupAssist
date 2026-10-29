@@ -1,11 +1,10 @@
 import "server-only";
 import { prisma } from "@/prisma/client/server";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
-import { collectFormats, isFormatRequest } from "@/services/request/format-manager";
 import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
-import { executeContextTool } from "@/services/tools";
+import { executeContextTool, formatToolResult } from "@/services/tools";
 
 /** Lists the most recently updated chats. */
 export async function listChats() {
@@ -75,6 +74,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
   const requestMessages = [...messages];
   const requestInstructions: string[] = [];
+  const toolFormats: Array<{ name: string; format: string; guidelines: string }> = [];
   let text = "";
   let provider = fallbackCredentials[0].provider;
   let model = fallbackCredentials[0].model!;
@@ -88,8 +88,10 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {
-          const result = await executeContextTool({ name: toolCall.name, authAccountToken });
-          return { id: toolCall.id, name: toolCall.name, result };
+          const data = await executeContextTool({ name: toolCall.name, authAccountToken });
+          const result = formatToolResult({ name: toolCall.name, data });
+          toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
+          return { id: toolCall.id, ...result };
         } catch (error) {
           return { id: toolCall.id, name: toolCall.name, error: error instanceof Error ? error.message : "The context tool failed." };
         }
@@ -100,14 +102,9 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       if (turn === 5) text = "I couldn’t complete the information lookup after several requests. Please try asking in a different way.";
       continue;
     }
-    const formatRequest = isFormatRequest(text);
     const contextRequest = isContextRequest(text);
-    if (!formatRequest && !contextRequest) break;
-    if (formatRequest) {
-      requestInstructions.push(formatRequest);
-      requestMessages.push({ role: "assistant", content: text });
-      requestMessages.push({ role: "user", content: `Available chat formats:\n${JSON.stringify(collectFormats())}` });
-    } else if (contextRequest) {
+    if (!contextRequest) break;
+    if (contextRequest) {
       requestInstructions.push(contextRequest);
       onContextRequest?.(contextRequest);
       const context = await contextManager.collect(contextRequest, authAccountToken);
@@ -130,5 +127,5 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     ] });
     return saved;
   });
-  return { reply: text, provider, model, chatId: chat.id, requests: requestInstructions } as const;
+  return { reply: text, provider, model, chatId: chat.id, requests: requestInstructions, toolFormats } as const;
 }
