@@ -51,15 +51,15 @@ export function EstateSavedProperty({ property: rawProperty }: { property: Prope
   const propertyId = readDisplayValue(property.propertyId) ?? readDisplayValue(property.id);
   const displayTitle = title === "Saved property" && propertyId ? `Property ${propertyId}` : title;
 
-  return <article className="estate-saved-property-card">
+  return <article className="mb-3 flex w-full max-w-[460px] items-center gap-3 rounded-[11px] border border-[#e6ebe4] bg-white p-[10px]">
     {image
-      ? <Image className="estate-saved-property-image" src={image} alt="" width={76} height={68} unoptimized />
-      : <span className="estate-saved-property-placeholder" aria-hidden="true">⌂</span>}
-    <div className="estate-saved-property-content">
-      <strong>{displayTitle}</strong>
-      {price && <span className="estate-saved-property-price">{price}</span>}
-      {(location || propertyType) && <span className="estate-saved-property-meta">{[propertyType, location].filter(Boolean).join(" · ")}</span>}
-      {savedAt && <span className="estate-saved-property-meta">Saved {savedAt}</span>}
+      ? <Image className="h-[68px] w-[76px] shrink-0 rounded-lg object-cover" src={image} alt="" width={76} height={68} unoptimized />
+      : <span className="grid h-[68px] w-[76px] shrink-0 place-items-center rounded-lg bg-[#edf3ec] text-2xl text-[#5d7c63]" aria-hidden="true">⌂</span>}
+    <div className="grid min-w-0 gap-[2px]">
+      <strong className="text-[15px] font-semibold text-[#435046]">{displayTitle}</strong>
+      {price && <span className="text-[14px] font-semibold text-[#526e57]">{price}</span>}
+      {(location || propertyType) && <span className="text-[14px] leading-[1.4] text-[#858f86]">{[propertyType, location].filter(Boolean).join(" · ")}</span>}
+      {savedAt && <span className="text-[14px] leading-[1.4] text-[#858f86]">Saved {savedAt}</span>}
     </div>
   </article>;
 }

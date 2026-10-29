@@ -35,31 +35,31 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="workspace">
-      <aside className="sidebar">
-        <div className="brand-row">
-          <Link href="/chat" className="brand-lockup"><span className="brand-mark"><Icon name="sparkles" size={16} /></span><span className="brand-name">nia<span className="brand-period">.</span></span></Link>
-          <Button variant="plain" size="icon" aria-label="Collapse sidebar" className="icon-button sidebar-collapse"><Icon name="panel" size={17} /></Button>
+    <div className="flex h-dvh w-full overflow-hidden bg-background">
+      <aside className="relative z-[2] flex h-dvh shrink-0 basis-[264px] flex-col border-r border-border bg-[hsl(var(--sidebar))] px-[15px] pb-[14px] pt-[22px] max-[760px]:basis-[226px] max-[760px]:px-[11px] max-[600px]:fixed max-[600px]:inset-x-0 max-[600px]:bottom-0 max-[600px]:z-[5] max-[600px]:h-[61px] max-[600px]:w-full max-[600px]:flex-row max-[600px]:items-center max-[600px]:justify-center max-[600px]:border-r-0 max-[600px]:border-t max-[600px]:bg-[#fcfcf9] max-[600px]:px-3 max-[600px]:py-[max(5px,env(safe-area-inset-bottom))]">
+        <div className="flex h-[33px] items-center justify-between px-[3px] pl-[3px] pr-1 max-[600px]:hidden">
+          <Link href="/chat" className="inline-flex items-center gap-[9px]"><span className="grid h-7 w-7 place-items-center rounded-[9px] bg-[#456f5b] text-white"><Icon name="sparkles" size={16} /></span><span className="text-[21px] font-semibold leading-none tracking-[-.055em]">nia<span className="text-[#6e9a7e">.</span></span></Link>
+          <Button variant="plain" size="icon" aria-label="Collapse sidebar" className="icon-button !h-[31px] !w-[31px]"><Icon name="panel" size={17} /></Button>
         </div>
-        <Button variant="outlined" className="new-chat" onClick={() => window.location.assign("/chat")}><Icon name="plus" size={16} /><span>New chat</span><kbd>⌘ K</kbd></Button>
+        <Button variant="outlined" className="mt-[27px] !h-10 !w-full !justify-start !gap-[9px] !rounded-[9px] !border-border !bg-white !text-[14px] !font-medium !text-[#353f39] shadow-[0_1px_2px_#18302306] hover:!bg-[#f8faf8] max-[600px]:hidden" onClick={() => window.location.assign("/chat")}><Icon name="plus" size={16} /><span>New chat</span><kbd className="ml-auto rounded-[5px] border border-[#e8ebe7] px-[5px] py-[2px] font-[inherit] text-[10px] text-[#8c948d]">⌘ K</kbd></Button>
 
-        <div className="nav-label">Workspace</div>
-        <nav className="primary-nav" aria-label="Workspace">
+        <div className="mt-[29px] mb-[10px] mx-[9px] text-[10px] font-semibold uppercase tracking-[.11em] text-[#919992] max-[600px]:hidden">Workspace</div>
+        <nav className="grid gap-[3px] max-[600px]:flex max-[600px]:w-full max-[600px]:max-w-[390px] max-[600px]:justify-around max-[600px]:gap-1" aria-label="Workspace">
           {navigation.map(({ href, label, icon }) => {
             const active = pathname === href || (href === "/chat" && pathname.startsWith("/chats/"));
-            return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`nav-item${active ? " is-active" : ""}`}><Icon name={icon} size={17} /><span>{label}</span>{active && <span className="nav-active-dot" />}</Link>;
+            return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`relative flex h-[38px] items-center gap-[10px] rounded-lg px-[10px] text-[14px] text-[#6d7770] transition-colors hover:bg-[#eff2ed] hover:text-[#38443d] ${active ? "bg-[#e9eee8] font-semibold text-[#345a46]" : ""} max-[600px]:h-[45px] max-[600px]:flex-1 max-[600px]:flex-col max-[600px]:justify-center max-[600px]:gap-[3px] max-[600px]:px-[2px] max-[600px]:py-[3px] max-[600px]:text-[12px] max-[600px]:[&[aria-current=page]]:bg-transparent`}><Icon name={icon} size={17} /><span>{label}</span>{active && <span className="ml-auto h-[5px] w-[5px] rounded-full bg-[#668b70] max-[600px]:absolute max-[600px]:left-1/2 max-[600px]:top-[2px] max-[600px]:m-0 max-[600px]:-translate-x-1/2" />}</Link>;
           })}
         </nav>
 
-        <div className="history-head"><span className="nav-label">Recent</span><Button variant="plain" size="icon" aria-label="Search chats" className="icon-button"><Icon name="search" size={15} /></Button></div>
-        <div className="history-list" aria-label="Saved chats">{chats.length ? chats.map((chat) => <Link key={chat.id} href={`/chats/${chat.id}`} className="history-item">{chat.title || "Untitled chat"}</Link>) : <span className="history-empty">No saved chats yet</span>}</div>
+        <div className="mx-[3px] mb-2 ml-[9px] mt-[31px] flex items-center justify-between max-[600px]:hidden"><span className="text-[10px] font-semibold uppercase tracking-[.11em] text-[#919992]">Recent</span><Button variant="plain" size="icon" aria-label="Search chats" className="icon-button !h-7 !w-7"><Icon name="search" size={15} /></Button></div>
+        <div className="grid gap-px max-[600px]:hidden" aria-label="Saved chats">{chats.length ? chats.map((chat) => <Link key={chat.id} href={`/chats/${chat.id}`} className="overflow-hidden rounded-[7px] px-[10px] py-[9px] text-[13px] text-[#778079] transition-colors hover:bg-[#f0f2ee] hover:text-[#46524a]">{chat.title || "Untitled chat"}</Link>) : <span className="px-[10px] py-2 text-[13px] text-[#9aa29b]">No saved chats yet</span>}</div>
 
-        <div className="sidebar-bottom">
-          <div className="plan-card"><span className="plan-icon"><Icon name="sparkles" size={15} /></span><div><strong>Nia Personal</strong><span>Personal assistant workspace</span></div><span className="online-dot" /></div>
-          <Button variant="plain" className="account-button"><span className="avatar">K</span><span className="account-details"><strong>Kishor Neupane</strong><span>Personal workspace</span></span><Icon name="settings" size={16} className="account-settings" /></Button>
+        <div className="mt-auto grid gap-[10px] max-[600px]:hidden">
+          <div className="flex items-center gap-[9px] rounded-[10px] border border-[#e7eae4] bg-[#fffefa] px-[10px] py-[11px]"><span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-[9px] bg-[#edf3ec] text-[#52785c]"><Icon name="sparkles" size={15} /></span><div className="grid min-w-0 gap-[2px]"><strong className="text-[13px] font-semibold text-[#37423a]">Nia Personal</strong><span className="text-[12px] text-[#909891]">Personal assistant workspace</span></div><span className="ml-auto inline-block h-[6px] w-[6px] shrink-0 rounded-full bg-[#6eaa79] shadow-[0_0_0_3px_#6eaa791b]" /></div>
+          <Button variant="plain" className="!min-h-[45px] !w-full !justify-start !gap-[9px] !px-1 !py-[5px] text-left"><span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[#d9e5d9] text-[12px] font-semibold text-[#43604a]">K</span><span className="grid min-w-0 flex-1 gap-[2px]"><strong className="text-[13px] font-semibold text-[#37423a]">Kishor Neupane</strong><span className="text-[12px] text-[#909891]">Personal workspace</span></span><Icon name="settings" size={16} className="text-[#8b948d]" /></Button>
         </div>
       </aside>
-      <main className="main-area">{children}</main>
+      <main className="relative flex h-dvh min-w-0 flex-1 flex-col max-[600px]:h-[calc(100dvh-61px)]">{children}</main>
     </div>
   );
 }
