@@ -10,6 +10,7 @@ export const chatClientService = {
   listApps: () => serviceRequest("/api/chat/apps"),
   get: (chatId: number) => serviceRequest("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId }) }),
   remove: (chatId: number) => serviceRequest(`/api/chats?id=${chatId}`, { method: "DELETE" }),
+  removeAll: () => serviceRequest("/api/chats?all=true", { method: "DELETE" }),
   send: (messages: Array<{ role: "user" | "assistant"; content: string }>, chatId?: number, retryPending = false) => serviceRequest("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages, chatId, retryPending }) }),
 };
 

@@ -121,6 +121,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
 
   useEffect(() => {
     if (!retryPendingOnOpen || !chatId || sending) return;
+    const pendingChatId = chatId;
     setRetryPendingOnOpen(false);
     setSending(true);
     setRequestProgress(null);
@@ -128,7 +129,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
     setSetupRequired(false);
     async function retryPendingResponse() {
       try {
-        const response = await chatClientService.send([], chatId, true);
+        const response = await chatClientService.send([], pendingChatId, true);
         const reader = response.body?.getReader();
         if (!reader) throw new Error("Nia couldn’t complete that request.");
         const decoder = new TextDecoder();

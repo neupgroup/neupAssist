@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { logApplicationError } from "../../server-logger";
 import { ensureAccount } from "../../../services/account";
-import { deleteChat, getChat, listChats } from "../../../services/chat";
+import { deleteAllAccountChats, deleteChat, getChat, listChats } from "../../../services/chat";
 
 export const runtime = "nodejs";
 
@@ -26,7 +26,14 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const chatId = Number(new URL(request.url).searchParams.get("id"));
+    const url = new URL(request.url);
+    if (url.searchParams.get("all") === "true") {
+      const account = await ensureAccount(await getCookie("auth_account"));
+      if (!account) return NextResponse.json({ error: "Sign in to delete your saved chats." }, { status: 401 });
+      const deleted = await deleteAllAccountChats(account.id);
+      return NextResponse.json({ deleted });
+    }
+    const chatId = Number(url.searchParams.get("id"));
     if (!Number.isInteger(chatId) || chatId < 1) return NextResponse.json({ error: "Chat ID must be a positive integer." }, { status: 400 });
     const deleted = await deleteChat(chatId);
     return deleted ? NextResponse.json({ id: chatId }) : NextResponse.json({ error: "Saved chat was not found." }, { status: 404 });

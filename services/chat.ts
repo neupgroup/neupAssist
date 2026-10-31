@@ -37,6 +37,13 @@ export async function deleteChat(chatId: number) {
   return result.count > 0;
 }
 
+/** Deletes every chat and cascading message owned by one account. */
+export async function deleteAllAccountChats(accountId: string) {
+  await logServiceRun("chat.delete_all", { accountId });
+  const result = await prisma.chat.deleteMany({ where: { account_id: accountId } });
+  return result.count;
+}
+
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type SavedCredential = {
