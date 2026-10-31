@@ -61,6 +61,29 @@ function renderMarkdownInline(text: string): ReactNode[] {
   return nodes;
 }
 
+/** Sanitizes model generated HTML to a small set of presentational card elements. */
+function sanitizeChatHtml(html: string): string {
+  return html
+    .replace(/<(script|style|iframe|object|embed|form|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<(script|style|iframe|object|embed|form|svg|math)\b[^>]*\/?>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(?:src|href)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, "")
+    .replace(/\s+(?:src|href)\s*=\s*javascript:[^\s>]*/gi, "");
+}
+
+/** Renders raw HTML card blocks embedded in Markdown as sanitized HTML. */
+function renderMarkdownHtml(text: string, keyPrefix: string): ReactNode[] {
+  const normalizedText = text.replace(/```(?:html)?\s*([\s\S]*?)```/gi, "$1").replace(/`(<(?:article|section|div|table|ul|ol|blockquote|img)\b[\s\S]*?(?:<\/(?:article|section|div|table|ul|ol|blockquote)>|\/>))`/gi, "$1");
+  const htmlStart = normalizedText.search(/<(?:article|section|div|table|ul|ol|blockquote|img|h[1-6]|p)\b/i);
+  if (htmlStart < 0) return renderMarkdownText(normalizedText, keyPrefix);
+  const nodes: ReactNode[] = [];
+  const leadingText = normalizedText.slice(0, htmlStart);
+  if (leadingText.trim()) nodes.push(...renderMarkdownText(leadingText, `${keyPrefix}-text`));
+  const html = sanitizeChatHtml(normalizedText.slice(htmlStart));
+  nodes.push(<div key={`${keyPrefix}-html`} className="chat-html-card" dangerouslySetInnerHTML={{ __html: html }} />);
+  return nodes;
+}
+
 /** Renders Nia's explicit content tags as semantic chat elements. */
 function renderNiaTags(text: string, keyPrefix: string): ReactNode[] {
   const pattern = /<nia\.(h1|h2|h3|code|image|imageUpload|fileUpload|filesUpload|table|list)>([\s\S]*?)<\/nia\.\1>/gi;
@@ -153,7 +176,7 @@ function renderMarkdownTables(text: string, keyPrefix: string): ReactNode[] {
       continue;
     }
     if (plain) {
-      if (plain.trim()) nodes.push(...renderMarkdownText(plain, `${keyPrefix}-text-${index++}`));
+      if (plain.trim()) nodes.push(...renderMarkdownHtml(plain, `${keyPrefix}-text-${index++}`));
       plain = "";
     }
     const rows = [splitMarkdownTableRow(header)];
@@ -166,7 +189,7 @@ function renderMarkdownTables(text: string, keyPrefix: string): ReactNode[] {
     }
     nodes.push(renderTableRows(rows, alignment, `${keyPrefix}-table-${index++}`));
   }
-  if (plain.trim()) nodes.push(...renderMarkdownText(plain, `${keyPrefix}-text-${index}`));
+  if (plain.trim()) nodes.push(...renderMarkdownHtml(plain, `${keyPrefix}-text-${index}`));
   return nodes;
 }
 

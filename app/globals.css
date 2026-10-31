@@ -98,6 +98,10 @@
 .message-body a { color: #416b4c; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .message-body a:hover { color: #2f5138; }
 .chat-rich-text > * + * { margin-top: 10px; }
+.chat-html-card { width: 100%; max-width: 100%; overflow-x: auto; }
+.chat-html-card > article, .chat-html-card > section, .chat-html-card > div { box-sizing: border-box; max-width: 100%; }
+.chat-html-card img { max-width: 100%; object-fit: cover; }
+.chat-html-card a { color: #52785e; text-decoration: underline; text-underline-offset: 2px; }
 .chat-rich-text h1, .chat-rich-text h2, .chat-rich-text h3 { margin-bottom: 0; color: #354a39; font-weight: 650; line-height: 1.35; }
 .chat-rich-text h1 { font-size: 22px; }
 .chat-rich-text h2 { font-size: 19px; }

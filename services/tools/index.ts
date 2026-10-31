@@ -78,8 +78,8 @@ async function discoverAvailableTools(authAccountToken?: string | null) {
       return {
         name,
         description: `${application.name}: ${tool.description}`,
-        format: `Structured data returned by ${application.name}; summarize it in readable Markdown, never raw JSON.`,
-        guidelines: `Summarize the returned ${application.name} data in clear, presentable Markdown. Use headings, bullets, or Markdown tables when useful. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
+        format: `Structured data returned by ${application.name}; summarize it in readable Markdown and use ordinary HTML cards for structured records, never raw JSON.`,
+        guidelines: `Summarize the returned ${application.name} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, render each as a compact, full-width horizontal HTML card directly in the Markdown. Use rounded corners consistently on every card and its image, and include an available image on the left; keep card height compact. Use ordinary HTML only; do not use Nia-specific tags, component blocks, or fenced component syntax. Do not use Markdown tables for records unless the user explicitly requests a table; reserve tables for an explicitly requested comparison. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
       };
     }),
   ];
