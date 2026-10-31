@@ -8,7 +8,7 @@ import { compileChat, compileChatPrompt, type ChatTurn } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
-import type { ToolCall } from "@/services/tools";
+import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export type ModelMessage = ChatTurn;
 
@@ -18,6 +18,7 @@ export type ModelRequest = {
   apiKey: string;
   messages: ModelMessage[];
   requestFormat?: string | null;
+  tools?: ToolDefinition[];
 };
 
 export type ModelResponse =
@@ -32,11 +33,29 @@ function readGenericResponse(provider: string, result: any): string | undefined 
   return result?.output ?? result?.text ?? result?.response;
 }
 
-export async function requestModel({ provider: rawProvider, model, apiKey, messages, requestFormat }: ModelRequest): Promise<ModelResponse> {
+/** Reads OpenAI-compatible tool calls and Anthropic tool-use blocks. */
+function readGenericToolCalls(provider: string, result: any): ToolCall[] {
+  if (provider === "anthropic") {
+    const blocks = Array.isArray(result?.content) ? result.content : [];
+    return blocks.flatMap((block: any, index: number) => block?.type === "tool_use" && typeof block.name === "string"
+      ? [{ id: typeof block.id === "string" ? block.id : `anthropic-tool-${index}`, name: block.name, arguments: block.input && typeof block.input === "object" && !Array.isArray(block.input) ? block.input : {} }]
+      : []);
+  }
+  const calls = result?.choices?.[0]?.message?.tool_calls;
+  if (!Array.isArray(calls)) return [];
+  return calls.flatMap((call: any, index: number) => {
+    if (typeof call?.function?.name !== "string") return [];
+    let args = call.function.arguments;
+    if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
+    return [{ id: typeof call.id === "string" ? call.id : `${provider}-tool-${index}`, name: call.function.name, arguments: args && typeof args === "object" && !Array.isArray(args) ? args : {} }];
+  });
+}
+
+export async function requestModel({ provider: rawProvider, model, apiKey, messages, requestFormat, tools = contextTools }: ModelRequest): Promise<ModelResponse> {
   const provider = rawProvider.toLowerCase();
   try { await logger.type("service-run").data({ service: "models.request", provider: rawProvider, model, messageCount: messages.length }).log(); } catch { /* Logging must not interrupt provider request handling. */ }
-  if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat });
-  if (provider === "nvidia") return requestNvidia({ model, apiKey, messages });
+  if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat, tools });
+  if (provider === "nvidia") return requestNvidia({ model, apiKey, messages, tools });
   const chatHistory = compileChat(messages);
   const defaultSystemPrompt = buildSystemPrompt({ includeTextContext: true });
   const prompt = compileChatPrompt(messages, defaultSystemPrompt);
@@ -63,13 +82,13 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
       if (!headers.has("content-type") && body !== undefined) headers.set("content-type", "application/json");
     } else {
       if (provider === "openrouter") {
-        const request = buildOpenRouterRequest({ model, messages });
+        const request = buildOpenRouterRequest({ model, messages, tools });
         url = request.url;
         body = JSON.stringify(request.body);
         for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
         headers.set("authorization", `Bearer ${apiKey}`);
       } else if (provider === "openai") {
-        const request = buildOpenAIRequest({ model, messages });
+        const request = buildOpenAIRequest({ model, messages, tools });
         url = request.url;
         body = JSON.stringify(request.body);
         for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
@@ -78,11 +97,11 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
         url = "https://api.anthropic.com/v1/messages";
         headers.set("x-api-key", apiKey);
         headers.set("anthropic-version", "2023-06-01");
-        body = JSON.stringify({ model, max_tokens: 2048, system: defaultSystemPrompt, messages: [{ role: "user", content: chatHistory }] });
+        body = JSON.stringify({ model, max_tokens: 2048, system: defaultSystemPrompt, messages: [{ role: "user", content: chatHistory }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ name, description, input_schema: parameters })) });
       } else {
         url = provider === "mistral" ? "https://api.mistral.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
         headers.set("authorization", `Bearer ${apiKey}`);
-        body = JSON.stringify({ model, messages: [{ role: "user", content: prompt }] });
+        body = JSON.stringify({ model, messages: [{ role: "user", content: prompt }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })), tool_choice: "auto" });
       }
     }
 
@@ -96,8 +115,9 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
       const detail = typeof result?.error?.message === "string" ? result.error.message : typeof result?.message === "string" ? result.message : responseBody.slice(0, 500) || "The provider request failed.";
       return { error: detail, status: response.status >= 400 && response.status < 500 ? 502 : 503 };
     }
+    const toolCalls = readGenericToolCalls(provider, result);
     const output = responseFormat ? extractOutputByFormat(responseBody, responseFormat) : readGenericResponse(provider, result) ?? (customFormat ? responseBody : undefined);
-    return typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
+    return toolCalls.length ? { output: typeof output === "string" ? output.trim() : "", toolCalls } : typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "The provider request could not be completed.", status: 502 };
   }

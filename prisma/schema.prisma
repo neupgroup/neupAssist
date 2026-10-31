@@ -41,6 +41,7 @@ model Account {
   status       String
   chats        Chat[]
   messages     Message[]
+  integrations Integration[]
 
   @@map("accounts")
 }
@@ -69,4 +70,35 @@ model Message {
 
   @@index([chat_id, sent_on])
   @@map("messages")
+}
+
+model Application {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  description   String         @db.Text
+  category      String
+  instructions  String         @db.Text
+  endpoints     Json           @db.JsonB
+  authMethod    String
+  moreDetails   String?        @db.Text
+  displayImage  String?
+  coverImage    String?
+  integrations  Integration[]
+
+  @@map("applications")
+}
+
+model Integration {
+  id             Int         @id @default(autoincrement())
+  application_id String      @db.Uuid
+  application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  account_id     String
+  account        Account     @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  auth_info      String      @db.VarChar(2048)
+  status         String      @default("active")
+  addedOn        DateTime    @default(now()) @db.Timestamp(3)
+
+  @@index([application_id])
+  @@index([account_id])
+  @@map("integrations")
 }

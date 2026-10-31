@@ -4,6 +4,7 @@ import { chatClientService } from "../services/client";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@neup/components/ui/alert-dialog";
 import { Link } from "@neup/components/ui/link";
 import { Icon } from "./ui-icon";
 
@@ -11,6 +12,8 @@ const navigation = [
   { href: "/chat", label: "Chat", icon: "chat" as const },
   { href: "/api", label: "API", icon: "code" as const },
   { href: "/manage/keys", label: "Manage keys", icon: "key" as const },
+  { href: "/manage/accounts", label: "Accounts", icon: "settings" as const },
+  { href: "/apps", label: "Apps and Integrations", icon: "code" as const },
   { href: "/settings", label: "Settings", icon: "settings" as const },
 ];
 
@@ -20,6 +23,8 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [chatActionError, setChatActionError] = useState("");
+  const [chatToDelete, setChatToDelete] = useState<SavedChat | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
 
   useEffect(() => {
     const loadChats = () => chatClientService.list()
@@ -36,18 +41,20 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   /** Deletes a saved conversation and returns to chat if it is open. */
   async function removeChat(chat: SavedChat) {
-    const title = chat.title || "Untitled chat";
-    if (!window.confirm(`Delete “${title}”? This will permanently delete the conversation.`)) return;
     setChatActionError("");
+    setDeletingChat(true);
     try {
       const response = await chatClientService.remove(chat.id);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not delete this chat.");
       setChats((current) => current.filter((entry) => entry.id !== chat.id));
       window.dispatchEvent(new Event("chats-updated"));
+      setChatToDelete(null);
       if (pathname === `/chat/${chat.id}`) window.location.assign("/chat");
     } catch (error) {
       setChatActionError(error instanceof Error ? error.message : "Could not delete this chat.");
+    } finally {
+      setDeletingChat(false);
     }
   }
 
@@ -69,7 +76,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mx-[3px] mb-2 ml-[9px] mt-[31px] flex items-center justify-between max-[600px]:hidden"><span className="text-[10px] font-semibold uppercase tracking-[.11em] text-[#919992]">Recent</span><Button variant="plain" size="icon" aria-label="Search chats" className="icon-button !h-7 !w-7"><Icon name="search" size={15} /></Button></div>
-        <div className="grid gap-px max-[600px]:hidden" aria-label="Saved chats">{chats.length ? chats.map((chat) => <div key={chat.id} className="group flex min-w-0 items-center rounded-[7px] transition-colors hover:bg-[#f0f2ee]"><Link href={`/chat/${chat.id}`} className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap px-[10px] py-[9px] text-[13px] text-[#778079] hover:text-[#46524a]">{chat.title || "Untitled chat"}</Link><button type="button" className="mr-1 grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-[#929b93] opacity-0 transition-opacity hover:bg-[#fff0ee] hover:text-[#b3544d] focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100" aria-label={`Delete ${chat.title || "Untitled chat"}`} title="Delete chat" onClick={() => void removeChat(chat)}><Icon name="trash" size={15} /></button></div>) : <span className="px-[10px] py-2 text-[13px] text-[#9aa29b]">No saved chats yet</span>}</div>
+        <div className="grid gap-px max-[600px]:hidden" aria-label="Saved chats">{chats.length ? chats.map((chat) => <div key={chat.id} className="group flex min-w-0 items-center rounded-[7px] transition-colors hover:bg-[#f0f2ee]"><Link href={`/chat/${chat.id}`} className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap px-[10px] py-[9px] text-[13px] text-[#778079] hover:text-[#46524a]">{chat.title || "Untitled chat"}</Link><button type="button" className="mr-1 grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-[#929b93] opacity-0 transition-opacity hover:bg-[#fff0ee] hover:text-[#b3544d] focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100" aria-label={`Delete ${chat.title || "Untitled chat"}`} title="Delete chat" onClick={() => { setChatActionError(""); setChatToDelete(chat); }}><Icon name="trash" size={15} /></button></div>) : <span className="px-[10px] py-2 text-[13px] text-[#9aa29b]">No saved chats yet</span>}</div>
         {chatActionError && <p className="mx-[9px] mt-2 text-xs text-[#a2564f]" role="alert">{chatActionError}</p>}
 
         <div className="mt-auto grid gap-[10px] max-[600px]:hidden">
@@ -78,6 +85,18 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <main className="relative flex h-dvh min-w-0 flex-1 flex-col max-[600px]:h-[calc(100dvh-61px)]">{children}</main>
+      <AlertDialog open={Boolean(chatToDelete)} onOpenChange={(open) => { if (!open && !deletingChat) setChatToDelete(null); }}>
+        <AlertDialogContent className="border-[#e6ebe4] bg-white text-[#344139] sm:rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#344139]">Delete this chat?</AlertDialogTitle>
+            <AlertDialogDescription className="leading-6 text-[#738078]">“{chatToDelete?.title || "Untitled chat"}” and its messages will be permanently deleted.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingChat} className="!border-[#e2e8e0] !text-[#566258]">Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={deletingChat || !chatToDelete} onClick={() => { if (chatToDelete) void removeChat(chatToDelete); }} className="!border-red-200 !bg-red-600 !text-white hover:!border-red-300 hover:!bg-red-700">{deletingChat ? "Deleting…" : "Delete chat"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

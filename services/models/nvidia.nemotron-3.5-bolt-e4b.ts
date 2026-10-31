@@ -4,7 +4,7 @@ import type { ChatMessage } from "../chat";
 import prompts from "../request/prompts.json";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
-import { contextTools, includeToolDiscovery, type ToolCall } from "@/services/tools";
+import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export const modelId = "nvidia/nemotron-3.5-bolt-e4b";
 const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -38,7 +38,7 @@ export function supportsModel(model: string) {
 }
 
 /** Builds the NVIDIA chat completion request for Nemotron Bolt E4B. */
-export function buildRequest(messages: ChatMessage[]) {
+export function buildRequest(messages: ChatMessage[], tools: ToolDefinition[] = contextTools) {
   return {
     url: invokeUrl,
     headers: {
@@ -54,7 +54,7 @@ export function buildRequest(messages: ChatMessage[]) {
       seed: 42,
       stream: true,
       parallel_tool_calls: true,
-      tools: includeToolDiscovery(contextTools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
+      tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
       tool_choice: "auto",
       chat_template_kwargs: { enable_thinking: true },
     },
@@ -163,11 +163,12 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
 }
 
 /** Sends a Nemotron request and collects the streamed assistant response. */
-export async function requestNemotron35BoltE4B({ apiKey, messages }: {
+export async function requestNemotron35BoltE4B({ apiKey, messages, tools = contextTools }: {
   apiKey: string;
   messages: ChatMessage[];
+  tools?: ToolDefinition[];
 }): Promise<{ output: string; toolCalls?: ToolCall[] } | { error: string; status: number }> {
-  const request = buildRequest(messages);
+  const request = buildRequest(messages, tools);
   const headers = new Headers(request.headers);
   headers.set("authorization", `Bearer ${apiKey}`);
   const body = JSON.stringify(request.body);

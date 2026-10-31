@@ -43,18 +43,6 @@ export const contextManager = {
       return { request, available: true, ...(await executeContextTool({ name: "personal_getNotifications", authAccountToken }) as object) };
     }
 
-    if (request === "--req.estate.leads--") {
-      return { request, available: true, ...(await executeContextTool({ name: "estate_getMyLeads", authAccountToken }) as object) };
-    }
-
-    if (request === "--req.estate.listings--") {
-      return { request, available: true, ...(await executeContextTool({ name: "estate_getMyListings", authAccountToken }) as object) };
-    }
-
-    if (request === "--req.estate.properties.favourites--" || request === "--req.estate.properties.saved--") {
-      return { request, ...(await executeContextTool({ name: "estate_getFavourites", authAccountToken }) as object) };
-    }
-
     return {
       request,
       available: false,

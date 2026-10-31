@@ -4,7 +4,7 @@ import { compileChat, compileChatPrompt } from "../request/chat";
 import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
-import { contextTools, includeToolDiscovery, type ToolCall } from "@/services/tools";
+import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export type GoogleModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
 
@@ -43,9 +43,10 @@ export type GoogleRequestConfig = {
   model: string;
   messages: ChatMessage[];
   systemInstruction?: string;
+  tools?: ToolDefinition[];
 };
 
-export function buildGoogleRequest({ model, messages, systemInstruction = prompts.persona }: GoogleRequestConfig) {
+export function buildGoogleRequest({ model, messages, systemInstruction = prompts.persona, tools = contextTools }: GoogleRequestConfig) {
   if (!supportsGoogleRequestModel(model)) throw new Error("Google Interactions requests require a Gemini model ID (gemini-…).");
   return {
     url: "https://generativelanguage.googleapis.com/v1beta/interactions",
@@ -54,17 +55,18 @@ export function buildGoogleRequest({ model, messages, systemInstruction = prompt
       model,
       system_instruction: systemInstruction,
       input: messages.map(({ role, content }) => (role === "assistant" ? "Assistant: " : "User: ") + content).join("\n\n"),
-      tools: includeToolDiscovery(contextTools).map(({ name, description, parameters }) => ({ type: "function", name, description, parameters })),
+      tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", name, description, parameters })),
     },
   };
 }
 
 /** Handles the complete Google API call, including model-specific formats. */
-export async function requestGoogle({ model, apiKey, messages, requestFormat }: {
+export async function requestGoogle({ model, apiKey, messages, requestFormat, tools = contextTools }: {
   model: string;
   apiKey: string;
   messages: ChatMessage[];
   requestFormat?: string | null;
+  tools?: ToolDefinition[];
 }): Promise<GoogleModelResponse> {
   const customFormat = requestFormat?.trim();
   const chatHistory = compileChat(messages);
@@ -87,7 +89,7 @@ export async function requestGoogle({ model, apiKey, messages, requestFormat }: 
       if (!curlTemplate.includes("{{apikey}}") && !headers.has("authorization") && !headers.has("x-api-key") && !headers.has("x-goog-api-key")) headers.set("x-goog-api-key", apiKey);
       if (!headers.has("content-type") && body !== undefined) headers.set("content-type", "application/json");
     } else {
-      const request = buildGoogleRequest({ model, messages });
+      const request = buildGoogleRequest({ model, messages, tools });
       url = request.url;
       body = JSON.stringify(request.body);
       for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);

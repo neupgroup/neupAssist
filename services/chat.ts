@@ -4,7 +4,9 @@ import { contextManager, isContextRequest } from "@/services/request/context-man
 import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
-import { executeContextTool, formatToolResult } from "@/services/tools";
+import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
+import { callRequirementsTool, discoverRequirementsTools, type McpToolDefinition } from "@/services/mcp/requirements";
+import { ensureAccount } from "@/services/account";
 
 /** Lists the most recently updated chats. */
 export async function listChats() {
@@ -55,13 +57,13 @@ function getFallbackCredentials(credentials: SavedCredential[]): ResolvedCredent
 }
 
 /** Tries saved providers in order and returns the first successful model response. */
-async function requestWithFallback(credentials: ResolvedCredential[], messages: ChatMessage[]) {
+async function requestWithFallback(credentials: ResolvedCredential[], messages: ChatMessage[], tools: ToolDefinition[]) {
   let lastFailure: { error: string; status: number } | null = null;
 
   for (const credential of credentials) {
     const provider = credential.provider.trim().toLowerCase();
     const model = credential.model.trim();
-    const result = await requestModel({ provider, model, apiKey: credential.key, messages });
+    const result = await requestModel({ provider, model, apiKey: credential.key, messages, tools });
     if (!("error" in result)) return { result, provider: credential.provider, model } as const;
     lastFailure = result;
   }
@@ -76,9 +78,37 @@ async function requestWithFallback(credentials: ResolvedCredential[], messages: 
 /** Sends a chat through saved providers, falling back across up to five providers. */
 export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onContextRequest?: (request: string) => void, authAccountToken?: string | null) {
   await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null });
+  let account: Awaited<ReturnType<typeof ensureAccount>> = null;
+  try {
+    account = await ensureAccount(authAccountToken);
+    if (account) {
+      await prisma.chat.updateMany({ where: { account_id: null }, data: { account_id: account.id } });
+      await prisma.message.updateMany({
+        where: { type: "userSent", chat: { is: { account_id: account.id } } },
+        data: { sent_by: account.id },
+      });
+    }
+  } catch { /* Keep chat available if account synchronization or legacy chat linking fails. */ }
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model: true, key: true } });
   const fallbackCredentials = getFallbackCredentials(credentials);
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
+  let requirementsTools: McpToolDefinition[] = [];
+  try { requirementsTools = await discoverRequirementsTools(authAccountToken); } catch { /* Keep chat available if the optional MCP server cannot be reached. */ }
+  const requirementsToolNames = new Map<string, string>();
+  const modelTools: ToolDefinition[] = [
+    ...contextTools,
+    ...requirementsTools.map((tool) => {
+      const name = `requirements__${tool.name}`;
+      requirementsToolNames.set(name, tool.name);
+      return {
+        name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+        format: "JSON returned by the requirements MCP tool.",
+        guidelines: "Use the returned requirements data to answer the user.",
+      };
+    }),
+  ];
   const requestMessages = [...messages];
   const requestInstructions: string[] = [];
   const toolFormats: Array<{ name: string; format: string; guidelines: string }> = [];
@@ -87,7 +117,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   let model = fallbackCredentials[0].model!;
   let chatId = requestedChatId;
   for (let turn = 0; turn < 6; turn += 1) {
-    const attempt = await requestWithFallback(fallbackCredentials, requestMessages);
+    const attempt = await requestWithFallback(fallbackCredentials, requestMessages, modelTools);
     if ("error" in attempt.result) return { ...attempt.result, provider: attempt.provider, model: attempt.model } as const;
     provider = attempt.provider;
     model = attempt.model;
@@ -95,6 +125,15 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {
+          const requirementsToolName = requirementsToolNames.get(toolCall.name);
+          if (requirementsToolName) {
+            const token = authAccountToken?.trim();
+            if (!token) throw new Error("Sign in is required to use requirements tools.");
+            const data = await callRequirementsTool(token, requirementsToolName, toolCall.arguments);
+            const result = { name: toolCall.name, data, format: "JSON returned by the requirements MCP tool.", guidelines: "Use the returned requirements data to answer the user." };
+            toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
+            return { id: toolCall.id, ...result };
+          }
           const data = await executeContextTool({ name: toolCall.name, authAccountToken, arguments: toolCall.arguments });
           const result = formatToolResult({ name: toolCall.name, data });
           toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
@@ -127,9 +166,11 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   if (!latestUserMessage) return { error: "The conversation must include a user message.", status: 400 } as const;
   const title = latestUserMessage.content.trim().slice(0, 120) || "New chat";
   const chat = await prisma.$transaction(async (transaction) => {
-    const saved = chatId === undefined ? await transaction.chat.create({ data: { title, status: "served" } }) : await transaction.chat.update({ where: { id: chatId }, data: { status: "served", lastUpdated: new Date() } });
+    const saved = chatId === undefined
+      ? await transaction.chat.create({ data: { title, status: "served", account_id: account?.id ?? null } })
+      : await transaction.chat.update({ where: { id: chatId }, data: { status: "served", lastUpdated: new Date(), ...(account ? { account_id: account.id } : {}) } });
     await transaction.message.createMany({ data: [
-      { chat_id: saved.id, type: "userSent" as const, content: latestUserMessage.content },
+      { chat_id: saved.id, type: "userSent" as const, content: latestUserMessage.content, sent_by: account?.id ?? null },
       { chat_id: saved.id, type: "intelligenceReply" as const, content: text },
     ] });
     return saved;

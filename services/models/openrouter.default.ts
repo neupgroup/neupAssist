@@ -1,5 +1,6 @@
 import type { ChatMessage } from "../chat";
 import { buildSystemPrompt } from "../request/prompts";
+import { contextTools, includeToolDiscovery, type ToolDefinition } from "@/services/tools";
 
 export const openRouterRequestFormat = {
   endpoint: "POST /api/v1/chat/completions",
@@ -31,9 +32,10 @@ export type OpenRouterRequestConfig = {
   model: string;
   messages: ChatMessage[];
   systemInstruction?: string;
+  tools?: ToolDefinition[];
 };
 
-export function buildOpenRouterRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }) }: OpenRouterRequestConfig) {
+export function buildOpenRouterRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }), tools = contextTools }: OpenRouterRequestConfig) {
   if (!supportsOpenRouterRequestModel(model)) throw new Error("OpenRouter model IDs must use the provider/model format, for example openai/gpt-4o.");
   return {
     url: "https://openrouter.ai/api/v1/chat/completions",
@@ -44,6 +46,8 @@ export function buildOpenRouterRequest({ model, messages, systemInstruction = bu
         { role: "system" as const, content: systemInstruction },
         ...messages,
       ],
+      tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
+      tool_choice: "auto",
     },
   };
 }

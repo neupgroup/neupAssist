@@ -1,5 +1,6 @@
 import type { ChatMessage } from "../chat";
 import { buildSystemPrompt } from "../request/prompts";
+import { contextTools, includeToolDiscovery, type ToolDefinition } from "@/services/tools";
 
 export const openAIRequestFormat = {
   endpoint: "POST /v1/chat/completions",
@@ -31,9 +32,10 @@ export type OpenAIRequestConfig = {
   model: string;
   messages: ChatMessage[];
   systemInstruction?: string;
+  tools?: ToolDefinition[];
 };
 
-export function buildOpenAIRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }) }: OpenAIRequestConfig) {
+export function buildOpenAIRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: true }), tools = contextTools }: OpenAIRequestConfig) {
   if (!supportsOpenAIRequestModel(model)) throw new Error("OpenAI Chat Completions requests require an OpenAI model ID (for example gpt-4o).");
   return {
     url: "https://api.openai.com/v1/chat/completions",
@@ -44,6 +46,8 @@ export function buildOpenAIRequest({ model, messages, systemInstruction = buildS
         { role: "system" as const, content: systemInstruction },
         ...messages,
       ],
+      tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })),
+      tool_choice: "auto",
     },
   };
 }

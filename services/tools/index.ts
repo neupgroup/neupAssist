@@ -1,12 +1,7 @@
 import "server-only";
 import { personal_getBasics, personal_getBasicsDefinition } from "./personal_getBasics";
 import { personal_getNotifications, personal_getNotificationsDefinition } from "./personal_getNotifications";
-import { estate_getMyLeads, estate_getMyLeadsDefinition } from "./estate_getMyLeads";
-import { estate_getMyListings, estate_getMyListingsDefinition } from "./estate_getMyListings";
-import { estate_getFavourites, estate_getFavouritesDefinition } from "./estate_getFavourites";
-import { estate_getLeadActivity, estate_getLeadActivityDefinition } from "./estate_getLeadActivity";
-import { estate_postLeadActivity, estate_postLeadActivityDefinition } from "./estate_postLeadActivity";
-import { estate_searchProperties, estate_searchPropertiesDefinition } from "./estate_searchProperties";
+import { discoverRequirementsTools } from "@/services/mcp/requirements";
 
 export type ToolDefinition = {
   name: string;
@@ -41,12 +36,6 @@ export const contextTools: ToolDefinition[] = [
   app_discoverToolsDefinition,
   personal_getBasicsDefinition,
   personal_getNotificationsDefinition,
-  estate_getMyLeadsDefinition,
-  estate_getMyListingsDefinition,
-  estate_getFavouritesDefinition,
-  estate_searchPropertiesDefinition,
-  estate_getLeadActivityDefinition,
-  estate_postLeadActivityDefinition,
 ];
 
 /** Ensures each model receives the tool-discovery declaration. */
@@ -57,6 +46,21 @@ export function includeToolDiscovery(tools: ToolDefinition[]) {
 /** Returns callable tools and their response formats without executing them. */
 export function discoverContextTools() {
   return app_discoverTools(contextTools);
+}
+
+/** Includes authenticated requirements MCP tools in explicit tool discovery. */
+async function discoverAvailableTools(authAccountToken?: string | null) {
+  let requirementsTools: Awaited<ReturnType<typeof discoverRequirementsTools>> = [];
+  try { requirementsTools = await discoverRequirementsTools(authAccountToken); } catch { /* Keep local tool discovery available when MCP is unavailable. */ }
+  return [
+    ...discoverContextTools(),
+    ...requirementsTools.map((tool) => ({
+      name: `requirements__${tool.name}`,
+      description: tool.description,
+      format: "JSON returned by the requirements MCP tool.",
+      guidelines: "Use the returned requirements data to answer the user.",
+    })),
+  ];
 }
 
 /** Adds a tool's response format and rendered guidelines to its result. */
@@ -75,15 +79,9 @@ export function formatToolResult({ name, data }: { name: string; data: unknown }
 export function executeContextTool({ name, authAccountToken, arguments: toolArguments }: { name: string; authAccountToken?: string | null; arguments?: Record<string, unknown> }): Promise<unknown> {
   const context: ToolExecutionContext = { authAccountToken, arguments: toolArguments };
   switch (name) {
-    case "app_discoverTools": return Promise.resolve(discoverContextTools());
+    case "app_discoverTools": return discoverAvailableTools(authAccountToken);
     case "personal_getBasics": return personal_getBasics(context);
     case "personal_getNotifications": return personal_getNotifications(context);
-    case "estate_getMyLeads": return estate_getMyLeads(context);
-    case "estate_getMyListings": return estate_getMyListings(context);
-    case "estate_getFavourites": return estate_getFavourites(context);
-    case "estate_searchProperties": return estate_searchProperties(context);
-    case "estate_getLeadActivity": return estate_getLeadActivity(context);
-    case "estate_postLeadActivity": return estate_postLeadActivity(context);
     default: return Promise.reject(new Error(`Unknown context tool: ${name}`));
   }
 }

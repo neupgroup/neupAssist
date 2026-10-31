@@ -107,14 +107,15 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
 }
 
 /** Routes NVIDIA requests to the model-specific handler or default format. */
-export async function requestNvidia({ model, apiKey, messages }: {
+export async function requestNvidia({ model, apiKey, messages, tools = contextTools }: {
   model: string;
   apiKey: string;
   messages: ChatMessage[];
+  tools?: ToolDefinition[];
 }): Promise<NvidiaModelResponse> {
-  if (supportsNemotron35BoltE4B(model)) return requestNemotron35BoltE4B({ apiKey, messages });
+  if (supportsNemotron35BoltE4B(model)) return requestNemotron35BoltE4B({ apiKey, messages, tools });
 
-  const request = buildNvidiaRequest({ model, messages });
+  const request = buildNvidiaRequest({ model, messages, tools });
   const headers = new Headers(request.headers);
   headers.set("authorization", `Bearer ${apiKey}`);
   const body = JSON.stringify(request.body);
