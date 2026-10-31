@@ -17,17 +17,17 @@ export async function listChats() {
 /** Loads a chat and converts stored messages to the conversation format. */
 export async function getChat(chatId: number) {
   await logServiceRun("chat.get", { chatId });
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, messages: { orderBy: { sent_on: "asc" }, select: { type: true, content: true } } } });
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "asc" }, { id: "asc" }], select: { type: true, content: true } } } });
   if (!chat) return null;
-  return { id: chat.id, title: chat.title, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
+  return { id: chat.id, title: chat.title, status: chat.status, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
 /** Loads the latest messages needed to render a saved chat on the server. */
 export async function getRecentChat(chatId: number, messageLimit = 10) {
   await logServiceRun("chat.get_recent", { chatId, messageLimit });
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
   if (!chat) return null;
-  return { id: chat.id, title: chat.title, messages: chat.messages.reverse().map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
+  return { id: chat.id, title: chat.title, status: chat.status, messages: chat.messages.reverse().map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
 /** Deletes a saved chat and its related messages. */
@@ -88,6 +88,28 @@ export type ChatProgressEvent = { type: "personalizing" } | { type: "connecting"
 
 /** Sends app discovery and tool execution progress to the active chat stream. */
 type ChatProgressHandler = (event: ChatProgressEvent) => void;
+
+/** Persists the new user message before any provider or application request starts. */
+async function persistUserMessage(content: string, requestedChatId: number | undefined, accountId: string | undefined) {
+  const title = content.replace(/@@\{\{\{[^{}]+\}\}\}/g, "@app").trim().slice(0, 120) || "New chat";
+  return prisma.$transaction(async (transaction) => {
+    const chat = requestedChatId === undefined
+      ? await transaction.chat.create({ data: { title, status: "toserve", account_id: accountId ?? null } })
+      : await transaction.chat.update({ where: { id: requestedChatId }, data: { status: "toserve", lastUpdated: new Date(), ...(accountId ? { account_id: accountId } : {}) } });
+    await transaction.message.create({ data: { chat_id: chat.id, type: "userSent", content, sent_by: accountId ?? null } });
+    return chat;
+  });
+}
+
+/** Persists the assistant response after the provider finishes. */
+async function persistAssistantMessage(chatId: number, content: string) {
+  if (!content.trim()) return false;
+  await prisma.$transaction(async (transaction) => {
+    await transaction.message.create({ data: { chat_id: chatId, type: "intelligenceReply", content } });
+    await transaction.chat.update({ where: { id: chatId }, data: { status: "served", lastUpdated: new Date() } });
+  });
+  return true;
+}
 
 /** Finds the connected application identity shown beside chat progress. */
 async function getConnectedAppIdentity(accountId: string | undefined, fallbackName: string) {
@@ -153,8 +175,18 @@ async function logCallerEvent({ accountId, applicationId, log }: { accountId?: s
 }
 
 /** Sends a chat through saved providers, falling back across up to five providers. */
-export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onProgress?: ChatProgressHandler, authAccountToken?: string | null) {
-  await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null });
+export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onProgress?: ChatProgressHandler, authAccountToken?: string | null, onChatSaved?: (chatId: number) => void, retryPending = false) {
+  await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null, retryPending });
+  let requestMessages = messages;
+  let latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
+  if (retryPending) {
+    if (requestedChatId === undefined) return { error: "A chat ID is required to retry a pending response.", status: 400 } as const;
+    const pendingChat = await prisma.chat.findUnique({ where: { id: requestedChatId }, select: { status: true, messages: { orderBy: [{ sent_on: "asc" }, { id: "asc" }], select: { type: true, content: true } } } });
+    if (!pendingChat || pendingChat.status !== "toserve" || pendingChat.messages.at(-1)?.type !== "userSent") return { error: "This chat has no pending response to retry.", status: 409 } as const;
+    requestMessages = pendingChat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, content: message.content }));
+    latestUserMessage = [...requestMessages].reverse().find((message) => message.role === "user");
+  }
+  if (!latestUserMessage) return { error: "The conversation must include a user message.", status: 400 } as const;
   let account: Awaited<ReturnType<typeof ensureAccount>> = null;
   try {
     account = await ensureAccount(authAccountToken);
@@ -166,11 +198,12 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       });
     }
   } catch { /* Keep chat available if account synchronization or legacy chat linking fails. */ }
+  const savedChat = retryPending ? null : await persistUserMessage(latestUserMessage.content, requestedChatId, account?.id);
+  const chatId = savedChat?.id ?? requestedChatId!;
+  onChatSaved?.(chatId);
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model: true, key: true } });
   const fallbackCredentials = getFallbackCredentials(credentials);
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
-  if (!latestUserMessage) return { error: "The conversation must include a user message.", status: 400 } as const;
   const mentionedApplicationIds = getMentionedApplicationIds(latestUserMessage.content);
   const hasExplicitAppMentions = mentionedApplicationIds.length > 0;
   onProgress?.({ type: "personalizing" });
@@ -221,7 +254,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       };
     }),
   ];
-  const requestMessages = messages.map((message) => ({
+  requestMessages = requestMessages.map((message) => ({
     ...message,
     content: message.role === "user" ? renderAppMentionsForModel(message.content, allConnectedApplications) : message.content,
   }));
@@ -238,7 +271,6 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   let text = "";
   let provider = fallbackCredentials[0].provider;
   let model = fallbackCredentials[0].model!;
-  let chatId = requestedChatId;
   for (let turn = 0; turn < 6; turn += 1) {
     const attempt = await requestWithFallback(fallbackCredentials, requestMessages, modelTools);
     if ("error" in attempt.result) return { ...attempt.result, provider: attempt.provider, model: attempt.model } as const;
@@ -312,16 +344,6 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       break;
     }
   }
-  const title = renderAppMentionsForModel(latestUserMessage.content, allConnectedApplications).trim().slice(0, 120) || "New chat";
-  const chat = await prisma.$transaction(async (transaction) => {
-    const saved = chatId === undefined
-      ? await transaction.chat.create({ data: { title, status: "served", account_id: account?.id ?? null } })
-      : await transaction.chat.update({ where: { id: chatId }, data: { status: "served", lastUpdated: new Date(), ...(account ? { account_id: account.id } : {}) } });
-    await transaction.message.createMany({ data: [
-      { chat_id: saved.id, type: "userSent" as const, content: latestUserMessage.content, sent_by: account?.id ?? null },
-      { chat_id: saved.id, type: "intelligenceReply" as const, content: text },
-    ] });
-    return saved;
-  });
-  return { reply: text, provider, model, chatId: chat.id, requests: requestInstructions, toolFormats } as const;
+  const savedReply = await persistAssistantMessage(chatId, text);
+  return { reply: savedReply ? text : "", provider, model, chatId, requests: requestInstructions, toolFormats } as const;
 }

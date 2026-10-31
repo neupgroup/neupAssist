@@ -18,5 +18,5 @@ export default async function SavedChatPage({ params }: { params: Promise<{ id: 
   if (!chat) notFound();
   const apps = await listConnectedChatApps(account?.id);
 
-  return <ChatPage initialChatId={chat.id} initialMessages={chat.messages} initialApps={apps} />;
+  return <ChatPage initialChatId={chat.id} initialMessages={chat.messages} initialStatus={chat.status} initialApps={apps} />;
 }

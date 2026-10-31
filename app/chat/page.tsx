@@ -61,11 +61,12 @@ function renderUserMessage(text: string, apps: ChatApp[]): ReactNode[] {
   return nodes;
 }
 
-function ChatConversationPage({ initialChatId, initialMessages, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialApps?: ChatApp[] } = {}) {
+function ChatConversationPage({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   const requestedChatId = initialChatId ? String(initialChatId) : searchParams.get("chatId");
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [chatId, setChatId] = useState<number | null>(initialChatId ?? null);
+  const [retryPendingOnOpen, setRetryPendingOnOpen] = useState(initialStatus === "toserve");
   const [draft, setDraft] = useState("");
   const [apps, setApps] = useState<ChatApp[]>(initialApps ?? []);
   const [draftMentions, setDraftMentions] = useState<MentionSpan[]>([]);
@@ -96,10 +97,12 @@ function ChatConversationPage({ initialChatId, initialMessages, initialApps }: {
     if (initialMessages !== undefined) {
       setMessages(initialMessages);
       setChatId(initialChatId ?? null);
+      setRetryPendingOnOpen(initialStatus === "toserve");
       return;
     }
     setMessages([]);
     setChatId(null);
+    setRetryPendingOnOpen(false);
     if (!requestedChatId) return;
     let cancelled = false;
     chatClientService.get(Number(requestedChatId)).then(async (response) => {
@@ -108,12 +111,61 @@ function ChatConversationPage({ initialChatId, initialMessages, initialApps }: {
       if (!cancelled) {
         setChatId(result.id);
         setMessages(result.messages);
+        setRetryPendingOnOpen(result.status === "toserve");
       }
     }).catch((loadError) => {
       if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load saved chat.");
     });
     return () => { cancelled = true; };
-  }, [requestedChatId, initialChatId, initialMessages]);
+  }, [requestedChatId, initialChatId, initialMessages, initialStatus]);
+
+  useEffect(() => {
+    if (!retryPendingOnOpen || !chatId || sending) return;
+    setRetryPendingOnOpen(false);
+    setSending(true);
+    setRequestProgress(null);
+    setError("");
+    setSetupRequired(false);
+    async function retryPendingResponse() {
+      try {
+        const response = await chatClientService.send([], chatId, true);
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("Nia couldn’t complete that request.");
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let result: Record<string, unknown> | null = null;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line) continue;
+            const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean };
+            if (event.type === "progress" && event.progress) setRequestProgress(event.progress);
+            else if (event.type === "final") result = event.result ?? null;
+            else if (event.type === "error") {
+              if (event.setupRequired) setSetupRequired(true);
+              throw new Error(event.error || "Nia couldn’t complete that request.");
+            }
+          }
+        }
+        if (!result) throw new Error("Nia couldn’t complete that request.");
+        if (typeof result.reply === "string" && result.reply.trim()) {
+          setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
+        } else {
+          setError("Nia returned an empty response. This chat will retry when you open it again.");
+        }
+        window.dispatchEvent(new Event("chats-updated"));
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
+      } finally {
+        setSending(false);
+      }
+    }
+    void retryPendingResponse();
+  }, [retryPendingOnOpen, chatId, sending]);
 
   useEffect(() => {
     keyClientService.list()
@@ -130,6 +182,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialApps }: {
     event.preventDefault();
     const text = draft.trim();
     if (!text || sending) return;
+    setRetryPendingOnOpen(false);
     const content = encodeSelectedAppMentions(text, draftMentions);
     const conversation = [...messages, { role: "user" as const, text: content }];
     setMessages(conversation);
@@ -156,15 +209,23 @@ function ChatConversationPage({ initialChatId, initialMessages, initialApps }: {
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line) continue;
-          const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean };
+          const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean; chatId?: number };
           if (event.type === "progress" && event.progress) setRequestProgress(event.progress);
+          else if (event.type === "saved" && event.chatId) {
+            setChatId(event.chatId);
+            window.dispatchEvent(new Event("chats-updated"));
+          }
           else if (event.type === "final") result = event.result ?? null;
           else if (event.type === "error") { if (event.setupRequired) setSetupRequired(true); throw new Error(event.error || "Nia couldn’t complete that request."); }
         }
       }
       if (!result) throw new Error("Nia couldn’t complete that request.");
       setChatId(result.chatId as number);
-      setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
+      if (typeof result.reply === "string" && result.reply.trim()) {
+        setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
+      } else {
+        setError("Nia returned an empty response. This chat will retry when you open it again.");
+      }
       window.dispatchEvent(new Event("chats-updated"));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Nia couldn’t complete that request.");
@@ -233,8 +294,8 @@ function ChatConversationPage({ initialChatId, initialMessages, initialApps }: {
 }
 
 /** Selects voice mode or the regular chat view from the current chat URL. */
-export default function ChatPage({ initialChatId, initialMessages, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialApps?: ChatApp[] } = {}) {
+export default function ChatPage({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
-  return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} initialApps={initialApps} />;
+  return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} initialStatus={initialStatus} initialApps={initialApps} />;
 }
