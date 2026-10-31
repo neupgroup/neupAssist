@@ -1,4 +1,5 @@
 import { contextTools, app_discoverToolsDefinition } from "@/services/tools";
+import { getMcpRequestHeaders } from "@/services/mcp/headers";
 import { getCookie } from "@neup/core/helpers/cookie";
 
 const mcpEndpoints = [
@@ -26,15 +27,9 @@ async function readMcpResponse(response: Response): Promise<JsonRpcResponse> {
 
 /** Sends one MCP JSON-RPC request and returns its response and session ID. */
 async function sendMcpRequest(endpoint: string, payload: Record<string, unknown>, authAccountToken: string, sessionId?: string) {
-  const headers: Record<string, string> = {
-    Accept: "application/json, text/event-stream",
-    "Content-Type": "application/json",
-    "x-auth": authAccountToken,
-  };
-  if (sessionId) headers["MCP-Session-Id"] = sessionId;
   const response = await fetch(endpoint, {
     method: "POST",
-    headers,
+    headers: getMcpRequestHeaders(endpoint, authAccountToken, sessionId),
     body: JSON.stringify(payload),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
@@ -62,12 +57,7 @@ async function discoverMcpTools(endpoint: string, authAccountToken: string): Pro
 
   const initializedNotice = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Accept: "application/json, text/event-stream",
-      "Content-Type": "application/json",
-      "x-auth": authAccountToken,
-      ...(initialized.sessionId ? { "MCP-Session-Id": initialized.sessionId } : {}),
-    },
+    headers: getMcpRequestHeaders(endpoint, authAccountToken, initialized.sessionId),
     body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),

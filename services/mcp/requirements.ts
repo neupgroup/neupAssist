@@ -1,4 +1,5 @@
 import "server-only";
+import { getMcpRequestHeaders } from "@/services/mcp/headers";
 
 const requirementsEndpoint = "https://neupgroup.com/estate/bridge/mcp.v1/requirements";
 
@@ -25,12 +26,7 @@ async function readMcpResponse(response: Response): Promise<JsonRpcResponse> {
 async function requestMcp(endpoint: string, token: string, payload: Record<string, unknown>, sessionId?: string) {
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Accept: "application/json, text/event-stream",
-      "Content-Type": "application/json",
-      "x-auth": token,
-      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
-    },
+    headers: getMcpRequestHeaders(endpoint, token, sessionId),
     body: JSON.stringify(payload),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
@@ -51,10 +47,7 @@ export async function discoverMcpTools(endpoint: string, token?: string | null):
 
   const notice = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      Accept: "application/json, text/event-stream", "Content-Type": "application/json", "x-auth": authToken,
-      ...(initialized.sessionId ? { "MCP-Session-Id": initialized.sessionId } : {}),
-    },
+    headers: getMcpRequestHeaders(endpoint, authToken, initialized.sessionId),
     body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     cache: "no-store", signal: AbortSignal.timeout(10_000),
   });
@@ -96,10 +89,7 @@ export async function callRequirementsTool(token: string, name: string, args: Re
   if (initialized.data.error) throw new Error(initialized.data.error.message ?? "Requirements MCP initialization failed.");
   const notice = await fetch(requirementsEndpoint, {
     method: "POST",
-    headers: {
-      Accept: "application/json, text/event-stream", "Content-Type": "application/json", "x-auth": token,
-      ...(initialized.sessionId ? { "MCP-Session-Id": initialized.sessionId } : {}),
-    },
+    headers: getMcpRequestHeaders(requirementsEndpoint, token, initialized.sessionId),
     body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     cache: "no-store", signal: AbortSignal.timeout(10_000),
   });

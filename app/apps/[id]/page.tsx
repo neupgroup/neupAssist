@@ -110,7 +110,10 @@ export default async function ApplicationDetailsPage({ params }: { params: Promi
     <section className="keys-page">
       <header className="topbar">
         <div className="breadcrumb"><Link href="/apps">Apps and Integrations</Link><span className="crumb-slash">/</span><strong>{application?.name ?? "Application"}</strong></div>
-        <Link href="/apps" className="text-sm text-[#738177] hover:text-[#365e45]">Back to apps</Link>
+        <div className="flex items-center gap-4">
+          <Link href={`/apps/${application?.id}/edit`} className="text-sm text-[#738177] hover:text-[#365e45]">Edit application</Link>
+          <Link href="/apps" className="text-sm text-[#738177] hover:text-[#365e45]">Back to apps</Link>
+        </div>
       </header>
       <div className="keys-content">
         {error || !application ? (
