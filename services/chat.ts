@@ -22,6 +22,14 @@ export async function getChat(chatId: number) {
   return { id: chat.id, title: chat.title, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
+/** Loads the latest messages needed to render a saved chat on the server. */
+export async function getRecentChat(chatId: number, messageLimit = 10) {
+  await logServiceRun("chat.get_recent", { chatId, messageLimit });
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
+  if (!chat) return null;
+  return { id: chat.id, title: chat.title, messages: chat.messages.reverse().map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
+}
+
 /** Deletes a saved chat and its related messages. */
 export async function deleteChat(chatId: number) {
   await logServiceRun("chat.delete", { chatId });

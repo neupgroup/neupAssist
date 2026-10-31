@@ -13,11 +13,11 @@ type ToolFormatHint = { name: string; format: string; guidelines: string };
 type Message = { role: "user" | "assistant"; text: string; toolFormats?: ToolFormatHint[] };
 type RequestProgress = { type: "personalizing" } | { type: "connecting" | "communicating"; app: string; logo: string | null };
 
-function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}) {
+function ChatConversationPage({ initialChatId, initialMessages }: { initialChatId?: number; initialMessages?: Message[] } = {}) {
   const searchParams = useSearchParams();
   const requestedChatId = initialChatId ? String(initialChatId) : searchParams.get("chatId");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [chatId, setChatId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
+  const [chatId, setChatId] = useState<number | null>(initialChatId ?? null);
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
@@ -28,6 +28,11 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    if (initialMessages !== undefined) {
+      setMessages(initialMessages);
+      setChatId(initialChatId ?? null);
+      return;
+    }
     setMessages([]);
     setChatId(null);
     if (!requestedChatId) return;
@@ -43,7 +48,7 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
       if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load saved chat.");
     });
     return () => { cancelled = true; };
-  }, [requestedChatId]);
+  }, [requestedChatId, initialChatId, initialMessages]);
 
   useEffect(() => {
     keyClientService.list()
@@ -128,8 +133,8 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
 }
 
 /** Selects voice mode or the regular chat view from the current chat URL. */
-export default function ChatPage({ initialChatId }: { initialChatId?: number } = {}) {
+export default function ChatPage({ initialChatId, initialMessages }: { initialChatId?: number; initialMessages?: Message[] } = {}) {
   const searchParams = useSearchParams();
   if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
-  return <ChatConversationPage initialChatId={initialChatId} />;
+  return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} />;
 }
