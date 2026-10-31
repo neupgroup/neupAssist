@@ -10,7 +10,7 @@ export const personal_getBasicsDefinition: ToolDefinition = {
   name: "personal_getBasics",
   description: "Get the signed-in user's basic profile details.",
   parameters: { type: "object", properties: {}, required: [] },
-  format: "```neup.personal.basics\n{\"displayName\":\"{{displayName}}\",\"displayImage\":\"{{displayImage}}\",\"neupid\":\"{{neupid}}\"}\n```",
+  format: "```nia.personal.basics\n{\"displayName\":\"{{displayName}}\",\"displayImage\":\"{{displayImage}}\",\"neupid\":\"{{neupid}}\"}\n```",
   guidelines: "Use this format when showing the user's profile: {{format}}. Omit fields that are null.",
 };
 

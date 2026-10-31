@@ -1,7 +1,9 @@
 import "server-only";
+import { prisma } from "@/prisma/client/server";
+import { ensureAccount } from "@/services/account";
+import { discoverMcpTools, getApplicationMcpEndpoints } from "@/services/mcp/client";
 import { personal_getBasics, personal_getBasicsDefinition } from "./personal_getBasics";
 import { personal_getNotifications, personal_getNotificationsDefinition } from "./personal_getNotifications";
-import { discoverRequirementsTools } from "@/services/mcp/requirements";
 
 export type ToolDefinition = {
   name: string;
@@ -48,18 +50,38 @@ export function discoverContextTools() {
   return app_discoverTools(contextTools);
 }
 
-/** Includes authenticated requirements MCP tools in explicit tool discovery. */
+/** Includes tools from every active application integration in explicit discovery. */
 async function discoverAvailableTools(authAccountToken?: string | null) {
-  let requirementsTools: Awaited<ReturnType<typeof discoverRequirementsTools>> = [];
-  try { requirementsTools = await discoverRequirementsTools(authAccountToken); } catch { /* Keep local tool discovery available when MCP is unavailable. */ }
+  const account = await ensureAccount(authAccountToken).catch(() => null);
+  const integrations = account ? await prisma.integration.findMany({
+    where: { account_id: account.id, status: "active" },
+    select: { application: { select: { id: true, name: true, endpoints: true } } },
+    orderBy: { addedOn: "desc" },
+  }).catch(() => []) : [];
+  const applications = new Map<string, { id: string; name: string; endpoints: ReturnType<typeof getApplicationMcpEndpoints> }>();
+  for (const { application } of integrations) {
+    if (!applications.has(application.id)) applications.set(application.id, { id: application.id, name: application.name, endpoints: getApplicationMcpEndpoints(application.endpoints) });
+  }
+  const discovered = await Promise.all([...applications.values()].flatMap((application) => application.endpoints.map(async (endpoint) => {
+    try { return { application, tools: await discoverMcpTools(endpoint.url, authAccountToken) }; }
+    catch { return { application, tools: [] as Awaited<ReturnType<typeof discoverMcpTools>> }; }
+  })));
+  const externalTools = discovered.flatMap(({ application, tools }) => tools.map((tool) => ({ application, tool })));
+  const usedNames = new Set<string>();
   return [
     ...discoverContextTools(),
-    ...requirementsTools.map((tool) => ({
-      name: `requirements__${tool.name}`,
-      description: tool.description,
-      format: "JSON returned by the requirements MCP tool.",
-      guidelines: "Use the returned requirements data to answer the user.",
-    })),
+    ...externalTools.map(({ application, tool }, index) => {
+      let name = `application__${tool.name}`;
+      if (usedNames.has(name)) name = `application__${application.name.replace(/[^a-zA-Z0-9]/g, "_")}__${tool.name}`;
+      if (usedNames.has(name)) name = `${name}__${index + 1}`;
+      usedNames.add(name);
+      return {
+        name,
+        description: `${application.name}: ${tool.description}`,
+        format: `Structured data returned by ${application.name}; summarize it in readable Markdown, never raw JSON.`,
+        guidelines: `Summarize the returned ${application.name} data in clear, presentable Markdown. Use headings, bullets, or Markdown tables when useful. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
+      };
+    }),
   ];
 }
 

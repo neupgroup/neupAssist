@@ -5,7 +5,7 @@ import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
 import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
-import { callRequirementsTool, discoverRequirementsTools, type McpToolDefinition } from "@/services/mcp/requirements";
+import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpToolDefinition } from "@/services/mcp/client";
 import { ensureAccount } from "@/services/account";
 
 /** Lists the most recently updated chats. */
@@ -83,13 +83,35 @@ type ChatProgressHandler = (event: ChatProgressEvent) => void;
 
 /** Finds the connected application identity shown beside chat progress. */
 async function getConnectedAppIdentity(accountId: string | undefined, fallbackName: string) {
-  if (!accountId) return { app: fallbackName, logo: null, id: undefined as string | undefined };
+  const fallback = { app: fallbackName, logo: null as string | null, id: undefined as string | undefined, instructions: "", endpoints: [] as ReturnType<typeof getApplicationMcpEndpoints> };
+  if (!accountId) return fallback;
   const integration = await prisma.integration.findFirst({
     where: { account_id: accountId, status: "active" },
-    select: { application: { select: { id: true, name: true, displayImage: true } } },
+    select: { application: { select: { id: true, name: true, displayImage: true, instructions: true, endpoints: true } } },
     orderBy: { addedOn: "desc" },
   });
-  return integration?.application ? { app: integration.application.name, logo: integration.application.displayImage, id: integration.application.id } : { app: fallbackName, logo: null, id: undefined };
+  return integration?.application ? { app: integration.application.name, logo: integration.application.displayImage, id: integration.application.id, instructions: integration.application.instructions, endpoints: getApplicationMcpEndpoints(integration.application.endpoints) } : fallback;
+}
+
+/** Loads every distinct active application connected to the signed-in account. */
+async function getConnectedAppIdentities(accountId: string | undefined) {
+  if (!accountId) return [];
+  const integrations = await prisma.integration.findMany({
+    where: { account_id: accountId, status: "active" },
+    select: { application: { select: { id: true, name: true, displayImage: true, instructions: true, endpoints: true } } },
+    orderBy: { addedOn: "desc" },
+  });
+  const applications = new Map<string, { app: string; logo: string | null; id: string; instructions: string; endpoints: ReturnType<typeof getApplicationMcpEndpoints> }>();
+  for (const { application } of integrations) {
+    if (!applications.has(application.id)) applications.set(application.id, {
+      app: application.name,
+      logo: application.displayImage,
+      id: application.id,
+      instructions: application.instructions,
+      endpoints: getApplicationMcpEndpoints(application.endpoints),
+    });
+  }
+  return [...applications.values()];
 }
 
 /** Records a redacted app communication event without interrupting chat on log failure. */
@@ -123,29 +145,47 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   const fallbackCredentials = getFallbackCredentials(credentials);
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
   onProgress?.({ type: "personalizing" });
-  let requirementsTools: McpToolDefinition[] = [];
+  let applicationTools: Array<{ endpoint: string; tool: McpToolDefinition; application: Awaited<ReturnType<typeof getConnectedAppIdentities>>[number] }> = [];
   const discoveryStartedAt = Date.now();
-  const appIdentity = await getConnectedAppIdentity(account?.id, "Neup Estate").catch(() => ({ app: "Neup Estate", logo: null, id: undefined }));
-  onProgress?.({ type: "connecting", ...appIdentity });
+  const connectedApplications = await getConnectedAppIdentities(account?.id).catch(() => []);
+  for (const application of connectedApplications) onProgress?.({ type: "connecting", app: application.app, logo: application.logo });
   try {
-    requirementsTools = await discoverRequirementsTools(authAccountToken);
-    await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_discovery", application: appIdentity.app, outcome: "success", toolCount: requirementsTools.length, durationMs: Date.now() - discoveryStartedAt } });
+    const discovered = await Promise.all(connectedApplications.flatMap((application) => application.endpoints.map(async (endpoint) => {
+      try {
+        const tools = await discoverMcpTools(endpoint.url, authAccountToken);
+        return { endpoint: endpoint.url, application, tools, failed: false };
+      } catch {
+        return { endpoint: endpoint.url, application, tools: [] as McpToolDefinition[], failed: true };
+      }
+    })));
+    applicationTools = discovered.flatMap(({ endpoint, application, tools }) => tools.map((tool) => ({ endpoint, application, tool })));
+    await Promise.all(connectedApplications.map((application) => {
+      const appTools = applicationTools.filter((entry) => entry.application.id === application.id);
+      const failed = discovered.some((entry) => entry.application.id === application.id && entry.failed);
+      return logCallerEvent({ accountId: account?.id, applicationId: application.id, log: { phase: "tool_discovery", application: application.app, outcome: failed && appTools.length === 0 ? "empty_or_failed" : "success", toolCount: appTools.length, durationMs: Date.now() - discoveryStartedAt } });
+    }));
   } catch { /* Keep chat available if the optional MCP server cannot be reached. */ }
-  if (requirementsTools.length === 0) {
-    await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_discovery", application: appIdentity.app, outcome: authAccountToken?.trim() ? "empty_or_failed" : "skipped_unauthenticated", durationMs: Date.now() - discoveryStartedAt } });
+  if (applicationTools.length === 0) {
+    if (connectedApplications.length === 0) {
+      await logCallerEvent({ accountId: account?.id, log: { phase: "tool_discovery", outcome: authAccountToken?.trim() ? "no_active_applications" : "skipped_unauthenticated", durationMs: Date.now() - discoveryStartedAt } });
+    }
   }
-  const requirementsToolNames = new Map<string, string>();
+  const applicationToolEndpoints = new Map<string, { name: string; endpoint: string; application: typeof connectedApplications[number] }>();
+  const applicationToolNames = new Set<string>();
   const modelTools: ToolDefinition[] = [
     ...contextTools,
-    ...requirementsTools.map((tool) => {
-      const name = `requirements__${tool.name}`;
-      requirementsToolNames.set(name, tool.name);
+    ...applicationTools.map(({ endpoint, tool, application }, index) => {
+      let name = `application__${tool.name}`;
+      if (applicationToolNames.has(name)) name = `application__${application.app.replace(/[^a-zA-Z0-9]/g, "_")}__${tool.name}`;
+      if (applicationToolNames.has(name)) name = `${name}__${index + 1}`;
+      applicationToolNames.add(name);
+      applicationToolEndpoints.set(name, { name: tool.name, endpoint, application });
       return {
         name,
-        description: tool.description,
-        parameters: tool.inputSchema,
-        format: "JSON returned by the requirements MCP tool.",
-        guidelines: "Use the returned requirements data to answer the user.",
+        description: `${application.app}: ${tool.description}`,
+        parameters: { type: "object", properties: tool.inputSchema.properties ?? {}, required: tool.inputSchema.required ?? [] },
+        format: `Structured data returned by ${application.app}; summarize it in readable Markdown, never raw JSON.`,
+        guidelines: `Summarize the returned ${application.app} data in clear, presentable Markdown. Use headings, bullets, or Markdown tables when useful. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
       };
     }),
   ];
@@ -165,19 +205,19 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {
-          const requirementsToolName = requirementsToolNames.get(toolCall.name);
-          if (requirementsToolName) {
+          const applicationTool = applicationToolEndpoints.get(toolCall.name);
+          if (applicationTool) {
             const token = authAccountToken?.trim();
-            if (!token) throw new Error("Sign in is required to use requirements tools.");
-            onProgress?.({ type: "communicating", ...appIdentity });
+            if (!token) throw new Error("Sign in is required to use application tools.");
+            onProgress?.({ type: "communicating", app: applicationTool.application.app, logo: applicationTool.application.logo });
             const startedAt = Date.now();
-            const data = await callRequirementsTool(token, requirementsToolName, toolCall.arguments);
-            await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_call", application: appIdentity.app, tool: requirementsToolName, argumentKeys: Object.keys(toolCall.arguments), outcome: "success", durationMs: Date.now() - startedAt } });
-            const result = { name: toolCall.name, data, format: "JSON returned by the requirements MCP tool.", guidelines: "Use the returned requirements data to answer the user." };
+            const data = await callMcpTool(applicationTool.endpoint, token, applicationTool.name, toolCall.arguments);
+            await logCallerEvent({ accountId: account?.id, applicationId: applicationTool.application.id, log: { phase: "tool_call", application: applicationTool.application.app, tool: applicationTool.name, argumentKeys: Object.keys(toolCall.arguments), outcome: "success", durationMs: Date.now() - startedAt } });
+            const result = { name: toolCall.name, data, format: `Structured data returned by ${applicationTool.application.app}; summarize it in readable Markdown, never raw JSON.`, guidelines: `Summarize the returned ${applicationTool.application.app} data in clear, presentable Markdown. Use headings, bullets, or Markdown tables when useful. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).` };
             toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
             return { id: toolCall.id, ...result };
           }
-          const toolAppIdentity = await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined }));
+          const toolAppIdentity = await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined, instructions: "", endpoints: [] }));
           onProgress?.({ type: "communicating", ...toolAppIdentity });
           const startedAt = Date.now();
           const data = await executeContextTool({ name: toolCall.name, authAccountToken, arguments: toolCall.arguments });
@@ -186,9 +226,9 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
           toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
           return { id: toolCall.id, ...result };
         } catch (error) {
-          const app = requirementsToolNames.has(toolCall.name) ? appIdentity.app : "Personal";
-          const failedIdentity = requirementsToolNames.has(toolCall.name) ? appIdentity : await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined }));
-          await logCallerEvent({ accountId: account?.id, applicationId: failedIdentity.id, log: { phase: "tool_call", application: app, tool: toolCall.name, outcome: "error", error: error instanceof Error ? error.message : "The context tool failed." } });
+          const application = applicationToolEndpoints.get(toolCall.name)?.application;
+          const failedIdentity = application ?? await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined, instructions: "", endpoints: [] }));
+          await logCallerEvent({ accountId: account?.id, applicationId: failedIdentity.id, log: { phase: "tool_call", application: failedIdentity.app, tool: toolCall.name, outcome: "error", error: error instanceof Error ? error.message : "The context tool failed." } });
           return { id: toolCall.id, name: toolCall.name, error: error instanceof Error ? error.message : "The context tool failed." };
         }
       }));

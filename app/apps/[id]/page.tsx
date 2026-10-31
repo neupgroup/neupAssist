@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { prisma } from "@/prisma/client/server";
 import { ensureAccount } from "@/services/account";
-import { discoverMcpTools, type McpToolDefinition } from "@/services/mcp/requirements";
+import { discoverMcpTools, type McpToolDefinition } from "@/services/mcp/client";
+import { connectApplication } from "./connect-action";
 
 export const dynamic = "force-dynamic";
 
@@ -91,19 +92,21 @@ async function loadApplication(id: string) {
         return { ...endpoint, tools: [], error: error instanceof Error ? error.message : "Could not discover MCP functions." };
       }
     }));
-    return { application, mcpServers, error: false };
+    const isConnected = Boolean(application?.integrations.some((integration) => integration.status === "active"));
+    return { application, mcpServers, isConnected, error: false };
   } catch {
-    return { application: null, mcpServers: [], error: true };
+    return { application: null, mcpServers: [], isConnected: false, error: true };
   }
 }
 
 /** Renders details for one application catalog entry. */
-export default async function ApplicationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ApplicationDetailsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ connect?: string; connected?: string }> }) {
   const { id: rawId } = await params;
+  const query = await searchParams;
   const applicationId = rawId.trim();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId)) notFound();
 
-  const { application, mcpServers, error } = await loadApplication(applicationId);
+  const { application, mcpServers, isConnected, error } = await loadApplication(applicationId);
   if (!application && !error) notFound();
 
   return (
@@ -129,6 +132,18 @@ export default async function ApplicationDetailsPage({ params }: { params: Promi
                 <span className="rounded-full bg-[#edf4ec] px-3 py-1 text-xs font-semibold text-[#5b8062]">{application.category}</span>
               </div>
               <p className="page-description">{application.description}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {isConnected ? (
+                  <span className="rounded-lg border border-[#dce8dc] bg-[#edf4ec] px-4 py-2 text-sm font-semibold text-[#52785e]">Connected</span>
+                ) : (
+                  <form action={connectApplication}>
+                    <input type="hidden" name="applicationId" value={application.id} />
+                    <button type="submit" className="rounded-lg bg-[#52785e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#456b51]">Connect to application</button>
+                  </form>
+                )}
+                {query.connect === "signin" && <p className="m-0 text-sm text-[#986750]" role="status">Sign in to connect this application.</p>}
+                {query.connected === "1" && <p className="m-0 text-sm text-[#52785e]" role="status">Application connected to your account.</p>}
+              </div>
             </div>
 
             <section className="mt-4" aria-labelledby="application-mcp-heading">
