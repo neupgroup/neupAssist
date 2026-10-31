@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { ensureAccount } from "@/services/account";
-import { getRecentChat } from "@/services/chat";
+import { getRecentChat, listConnectedChatApps } from "@/services/chat";
 import ChatPage from "../page";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +13,10 @@ export default async function SavedChatPage({ params }: { params: Promise<{ id: 
 
   if (!Number.isSafeInteger(id) || id < 1) notFound();
 
-  await ensureAccount(await getCookie("auth_account"));
+  const account = await ensureAccount(await getCookie("auth_account"));
   const chat = await getRecentChat(id, 10);
   if (!chat) notFound();
+  const apps = await listConnectedChatApps(account?.id);
 
-  return <ChatPage initialChatId={chat.id} initialMessages={chat.messages} />;
+  return <ChatPage initialChatId={chat.id} initialMessages={chat.messages} initialApps={apps} />;
 }

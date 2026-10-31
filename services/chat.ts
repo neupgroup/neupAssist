@@ -122,6 +122,23 @@ async function getConnectedAppIdentities(accountId: string | undefined) {
   return [...applications.values()];
 }
 
+/** Lists the connected apps that can be mentioned in chat. */
+export async function listConnectedChatApps(accountId: string | undefined) {
+  const applications = await getConnectedAppIdentities(accountId);
+  return applications.map(({ id, app, logo }) => ({ id, name: app, logo }));
+}
+
+/** Extracts the distinct application IDs explicitly mentioned in a chat message. */
+function getMentionedApplicationIds(content: string) {
+  return [...new Set(Array.from(content.matchAll(/@@\{\{\{([^{}]+)\}\}\}/g), (match) => match[1]))];
+}
+
+/** Replaces internal app mention markers with readable names for the model. */
+function renderAppMentionsForModel(content: string, applications: Awaited<ReturnType<typeof getConnectedAppIdentities>>) {
+  const applicationNames = new Map(applications.map((application) => [application.id, application.app]));
+  return content.replace(/@@\{\{\{([^{}]+)\}\}\}/g, (_marker, id: string) => `@${applicationNames.get(id) ?? "app"}`);
+}
+
 /** Records a redacted app communication event without interrupting chat on log failure. */
 async function logCallerEvent({ accountId, applicationId, log }: { accountId?: string; applicationId?: string; log: Record<string, unknown> }) {
   try {
@@ -152,10 +169,17 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model: true, key: true } });
   const fallbackCredentials = getFallbackCredentials(credentials);
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
+  if (!latestUserMessage) return { error: "The conversation must include a user message.", status: 400 } as const;
+  const mentionedApplicationIds = getMentionedApplicationIds(latestUserMessage.content);
+  const hasExplicitAppMentions = mentionedApplicationIds.length > 0;
   onProgress?.({ type: "personalizing" });
   let applicationTools: Array<{ endpoint: string; tool: McpToolDefinition; application: Awaited<ReturnType<typeof getConnectedAppIdentities>>[number] }> = [];
   const discoveryStartedAt = Date.now();
-  const connectedApplications = await getConnectedAppIdentities(account?.id).catch(() => []);
+  const allConnectedApplications = await getConnectedAppIdentities(account?.id).catch(() => []);
+  const connectedApplications = hasExplicitAppMentions
+    ? allConnectedApplications.filter((application) => mentionedApplicationIds.includes(application.id))
+    : allConnectedApplications;
   for (const application of connectedApplications) onProgress?.({ type: "connecting", app: application.app, logo: application.logo });
   try {
     const discovered = await Promise.all(connectedApplications.flatMap((application) => application.endpoints.map(async (endpoint) => {
@@ -181,7 +205,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   const applicationToolEndpoints = new Map<string, { name: string; endpoint: string; application: typeof connectedApplications[number] }>();
   const applicationToolNames = new Set<string>();
   const modelTools: ToolDefinition[] = [
-    ...contextTools,
+    ...(hasExplicitAppMentions ? [] : contextTools),
     ...applicationTools.map(({ endpoint, tool, application }, index) => {
       let name = `application__${tool.name}`;
       if (applicationToolNames.has(name)) name = `application__${application.app.replace(/[^a-zA-Z0-9]/g, "_")}__${tool.name}`;
@@ -197,9 +221,20 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       };
     }),
   ];
-  const requestMessages = [...messages];
+  const requestMessages = messages.map((message) => ({
+    ...message,
+    content: message.role === "user" ? renderAppMentionsForModel(message.content, allConnectedApplications) : message.content,
+  }));
+  if (hasExplicitAppMentions) {
+    const selectedAppNames = connectedApplications.map((application) => application.app);
+    requestMessages.push({
+      role: "user",
+      content: `The user explicitly selected these applications for this request: ${selectedAppNames.join(", ") || "none available"}. Use tools only from these selected applications. Call at least one relevant tool from every selected application before answering. Do not use personal context tools or tools from other applications.`,
+    });
+  }
   const requestInstructions: string[] = [];
   const toolFormats: Array<{ name: string; format: string; guidelines: string }> = [];
+  const calledApplicationIds = new Set<string>();
   let text = "";
   let provider = fallbackCredentials[0].provider;
   let model = fallbackCredentials[0].model!;
@@ -215,6 +250,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
         try {
           const applicationTool = applicationToolEndpoints.get(toolCall.name);
           if (applicationTool) {
+            calledApplicationIds.add(applicationTool.application.id);
             const token = authAccountToken?.trim();
             if (!token) throw new Error("Sign in is required to use application tools.");
             onProgress?.({ type: "communicating", app: applicationTool.application.app, logo: applicationTool.application.logo });
@@ -243,11 +279,27 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       requestMessages.push({ role: "assistant", content: text || "I’m checking the requested information." });
       requestMessages.push({ role: "user", content: `Tool results:\n${JSON.stringify(toolResults)}` });
       requestInstructions.push(...toolResults.map(({ name }) => `tool:${name}`));
+      if (hasExplicitAppMentions) {
+        const remainingApplications = connectedApplications.filter((application) => !calledApplicationIds.has(application.id));
+        if (remainingApplications.length) requestMessages.push({ role: "user", content: `Continue by calling at least one relevant available tool from each of these selected applications before answering: ${remainingApplications.map((application) => application.app).join(", ")}. Use no other tools.` });
+      }
       if (turn === 5) text = "I couldn’t complete the information lookup after several requests. Please try asking in a different way.";
       continue;
     }
+    if (hasExplicitAppMentions) {
+      const remainingApplications = connectedApplications.filter((application) => !calledApplicationIds.has(application.id));
+      if (remainingApplications.length) {
+        if (turn === 5) {
+          text = `I couldn’t reach a relevant tool from ${remainingApplications.map((application) => application.app).join(" and ")}. Please try again.`;
+          break;
+        }
+        requestMessages.push({ role: "assistant", content: text || "I’m checking the selected applications." });
+        requestMessages.push({ role: "user", content: `Before answering, call at least one relevant available tool from each of these selected applications: ${remainingApplications.map((application) => application.app).join(", ")}. Use no other tools.` });
+        continue;
+      }
+    }
     const contextRequest = isContextRequest(text);
-    if (!contextRequest) break;
+    if (!contextRequest || hasExplicitAppMentions) break;
     if (contextRequest) {
       requestInstructions.push(contextRequest);
       onProgress?.({ type: "personalizing" });
@@ -260,9 +312,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       break;
     }
   }
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
-  if (!latestUserMessage) return { error: "The conversation must include a user message.", status: 400 } as const;
-  const title = latestUserMessage.content.trim().slice(0, 120) || "New chat";
+  const title = renderAppMentionsForModel(latestUserMessage.content, allConnectedApplications).trim().slice(0, 120) || "New chat";
   const chat = await prisma.$transaction(async (transaction) => {
     const saved = chatId === undefined
       ? await transaction.chat.create({ data: { title, status: "served", account_id: account?.id ?? null } })

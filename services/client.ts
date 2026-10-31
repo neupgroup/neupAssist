@@ -7,6 +7,7 @@ export async function serviceRequest(path: string, options: RequestInit = {}): P
 
 export const chatClientService = {
   list: () => serviceRequest("/api/chats"),
+  listApps: () => serviceRequest("/api/chat/apps"),
   get: (chatId: number) => serviceRequest("/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId }) }),
   remove: (chatId: number) => serviceRequest(`/api/chats?id=${chatId}`, { method: "DELETE" }),
   send: (messages: Array<{ role: "user" | "assistant"; content: string }>, chatId?: number) => serviceRequest("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages, chatId }) }),

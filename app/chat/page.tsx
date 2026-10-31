@@ -1,7 +1,7 @@
 "use client";
 import { chatClientService, keyClientService } from "../../services/client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
 import { Textarea } from "@neup/components/ui/textarea";
@@ -12,13 +12,64 @@ import VoiceAssistant from "@/components/voice/voice-assistant";
 type ToolFormatHint = { name: string; format: string; guidelines: string };
 type Message = { role: "user" | "assistant"; text: string; toolFormats?: ToolFormatHint[] };
 type RequestProgress = { type: "personalizing" } | { type: "connecting" | "communicating"; app: string; logo: string | null };
+type ChatApp = { id: string; name: string; logo: string | null };
+type MentionSpan = { start: number; end: number; appId: string };
 
-function ChatConversationPage({ initialChatId, initialMessages }: { initialChatId?: number; initialMessages?: Message[] } = {}) {
+/** Finds the app query currently being typed at the text cursor. */
+function findActiveAppQuery(value: string, cursor: number) {
+  const atPosition = value.lastIndexOf("@", cursor - 1);
+  if (atPosition < 0 || (atPosition > 0 && /[\p{L}\p{N}_]/u.test(value[atPosition - 1]))) return null;
+  const query = value.slice(atPosition + 1, cursor);
+  if (/[\s@]/.test(query)) return null;
+  return { start: atPosition, end: cursor, query };
+}
+
+/** Keeps selected app mentions aligned when text is inserted or removed. */
+function updateMentionSpans(mentions: MentionSpan[], previousText: string, nextText: string): MentionSpan[] {
+  let prefix = 0;
+  while (prefix < previousText.length && prefix < nextText.length && previousText[prefix] === nextText[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < previousText.length - prefix && suffix < nextText.length - prefix && previousText[previousText.length - 1 - suffix] === nextText[nextText.length - 1 - suffix]) suffix += 1;
+  const previousEditEnd = previousText.length - suffix;
+  const delta = nextText.length - previousText.length;
+  return mentions.flatMap((mention) => {
+    if (mention.end <= prefix) return [mention];
+    if (mention.start >= previousEditEnd) return [{ ...mention, start: mention.start + delta, end: mention.end + delta }];
+    return [];
+  });
+}
+
+/** Encodes selected visible app labels with their internal application IDs. */
+function encodeSelectedAppMentions(text: string, mentions: MentionSpan[]): string {
+  return [...mentions].sort((left, right) => right.start - left.start).reduce((content, mention) =>
+    `${content.slice(0, mention.start)}@@{{{${mention.appId}}}}${content.slice(mention.end)}`, text);
+}
+
+/** Renders encoded app IDs as readable @appname mentions in user messages. */
+function renderUserMessage(text: string, apps: ChatApp[]): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let index = 0;
+  for (const match of text.matchAll(/@@\{\{\{([^{}]+)\}\}\}/g)) {
+    const start = match.index ?? 0;
+    if (start > cursor) nodes.push(text.slice(cursor, start));
+    const app = apps.find(({ id }) => id === match[1]);
+    nodes.push(<span key={`app-mention-${index++}`} className="chat-app-mention">@{app?.name ?? match[1]}</span>);
+    cursor = start + match[0].length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
+function ChatConversationPage({ initialChatId, initialMessages, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   const requestedChatId = initialChatId ? String(initialChatId) : searchParams.get("chatId");
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [chatId, setChatId] = useState<number | null>(initialChatId ?? null);
   const [draft, setDraft] = useState("");
+  const [apps, setApps] = useState<ChatApp[]>(initialApps ?? []);
+  const [draftMentions, setDraftMentions] = useState<MentionSpan[]>([]);
+  const [activeAppQuery, setActiveAppQuery] = useState<{ start: number; end: number; query: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [requestProgress, setRequestProgress] = useState<RequestProgress | null>(null);
@@ -26,6 +77,20 @@ function ChatConversationPage({ initialChatId, initialMessages }: { initialChatI
   const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (initialApps !== undefined) {
+      setApps(initialApps);
+      return;
+    }
+    let cancelled = false;
+    chatClientService.listApps().then(async (response) => {
+      if (!response.ok) return [];
+      const result: unknown = await response.json();
+      return Array.isArray(result) ? result as ChatApp[] : [];
+    }).then((result) => { if (!cancelled) setApps(result); }).catch(() => { if (!cancelled) setApps([]); });
+    return () => { cancelled = true; };
+  }, [initialApps]);
 
   useEffect(() => {
     if (initialMessages !== undefined) {
@@ -65,16 +130,19 @@ function ChatConversationPage({ initialChatId, initialMessages }: { initialChatI
     event.preventDefault();
     const text = draft.trim();
     if (!text || sending) return;
-    const conversation = [...messages, { role: "user" as const, text }];
+    const content = encodeSelectedAppMentions(text, draftMentions);
+    const conversation = [...messages, { role: "user" as const, text: content }];
     setMessages(conversation);
     setDraft("");
+    setDraftMentions([]);
+    setActiveAppQuery(null);
     setSending(true);
     setRequestProgress(null);
     setError("");
     setSetupRequired(false);
     if (inputRef.current) inputRef.current.style.height = "auto";
     try {
-      const response = await chatClientService.send(conversation.map(({ role, text: content }) => ({ role, content })), chatId ?? undefined);
+      const response = await chatClientService.send(conversation.map(({ role, text: messageContent }) => ({ role, content: messageContent })), chatId ?? undefined);
       const reader = response.body?.getReader();
       if (!reader) throw new Error("Nia couldn’t complete that request.");
       const decoder = new TextDecoder();
@@ -105,6 +173,37 @@ function ChatConversationPage({ initialChatId, initialMessages }: { initialChatI
     }
   }
 
+  /** Replaces the active @query with a selected app mention. */
+  function selectMentionedApp(app: ChatApp) {
+    const textarea = inputRef.current;
+    if (!textarea || !activeAppQuery) return;
+    const { start } = activeAppQuery;
+    let end = activeAppQuery.end;
+    while (end < draft.length && !/\s/.test(draft[end])) end += 1;
+    const label = `@${app.name}`;
+    const insertion = `${label} `;
+    const nextDraft = `${draft.slice(0, start)}${insertion}${draft.slice(end)}`;
+    const delta = insertion.length - (end - start);
+    const retainedMentions = draftMentions.flatMap((mention) => {
+      if (mention.end <= start) return [mention];
+      if (mention.start >= end) return [{ ...mention, start: mention.start + delta, end: mention.end + delta }];
+      return [];
+    });
+    setDraft(nextDraft);
+    setDraftMentions([...retainedMentions, { start, end: start + label.length, appId: app.id }]);
+    setActiveAppQuery(null);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + insertion.length, start + insertion.length);
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    });
+  }
+
+  const matchingApps = activeAppQuery
+    ? apps.filter((app) => app.name.toLocaleLowerCase().includes(activeAppQuery.query.toLocaleLowerCase()))
+    : [];
+
   return <section className="chat-page">
     <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Chat</strong></div><div className="topbar-actions">{chatId && <Button variant="outlined" onClick={() => window.location.assign(`/chat/${chatId}?mode=voice`)}><Icon name="voice" size={16} /> Voice</Button>}<span className="model-status">{providerConfigured === null ? "Checking AI model…" : providerConfigured ? "AI model connected" : "No AI model connected"}</span>{providerConfigured === false && <Button variant="plain" size="sm" onClick={() => window.location.assign("/manage/keys")}>Connect</Button>}<Button variant="plain" size="icon" aria-label="More chat options" className="icon-button"><Icon name="more" size={19} /></Button></div></header>
     <div className="conversation-scroll">
@@ -118,7 +217,7 @@ function ChatConversationPage({ initialChatId, initialMessages }: { initialChatI
         </div>
       </div> : <div className="message-list">{messages.map((message, index) => <article className={`message message-${message.role}`} key={`${index}-${message.role}`}>
         {message.role === "assistant" ? <span className="message-avatar"><Icon name="sparkles" size={20} /></span> : <span className="user-message-label">You</span>}
-        <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{message.text}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
+        <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{renderUserMessage(message.text, apps)}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
       </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={20} /></span><div className="message-body" aria-live="polite" aria-atomic="true">
         {!requestProgress && <p className="request-status">Nia is thinking…</p>}
         {requestProgress?.type === "personalizing" && <p className="request-status">Please wait while I personalize results for you.</p>}
@@ -126,15 +225,16 @@ function ChatConversationPage({ initialChatId, initialMessages }: { initialChatI
       </div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
     </div>
     <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>
-      <Textarea ref={inputRef} value={draft} onChange={(event) => { setDraft(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />
+      {activeAppQuery && <div className="mention-suggestions" role="listbox" aria-label="Connected apps">{matchingApps.length ? matchingApps.map((app) => <button key={app.id} type="button" role="option" aria-selected="false" className="mention-suggestion" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMentionedApp(app)}>{app.logo ? <img src={app.logo} alt="" /> : <Icon name="code" size={16} />}<span>@{app.name}</span></button>) : <div className="mention-empty">No matching connected apps.</div>}</div>}
+      <Textarea ref={inputRef} value={draft} onChange={(event) => { const nextDraft = event.target.value; setDraftMentions((current) => updateMentionSpans(current, draft, nextDraft)); setDraft(nextDraft); setActiveAppQuery(findActiveAppQuery(nextDraft, event.target.selectionStart)); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onClick={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyUp={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyDown={(event) => { if (event.key === "Escape") setActiveAppQuery(null); if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />
       <div className="composer-footer"><div className="composer-tools"><Button type="button" variant="plain" size="icon" className="icon-button attach-button" aria-label="Attach a file"><Icon name="paperclip" size={17} /></Button><span className="composer-divider" /><span className="composer-hint">Nia can make mistakes. Check important info.</span></div><div className="composer-actions"><Button type="button" variant="plain" size="icon" className="icon-button voice-shortcut" aria-label="Open voice assistant" onClick={() => window.location.assign(chatId ? `/chat/${chatId}?mode=voice` : "/chat?mode=voice")}><Icon name="voice" size={17} /></Button><Button type="submit" variant="solid" size="icon" className="send-button" aria-label="Send message" disabled={!draft.trim() || sending}><Icon name="send" size={17} /></Button></div></div>
     </form><div className="composer-caption">Nia · Personal assistant</div></div>
   </section>;
 }
 
 /** Selects voice mode or the regular chat view from the current chat URL. */
-export default function ChatPage({ initialChatId, initialMessages }: { initialChatId?: number; initialMessages?: Message[] } = {}) {
+export default function ChatPage({ initialChatId, initialMessages, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
-  return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} />;
+  return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} initialApps={initialApps} />;
 }
