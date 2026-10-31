@@ -6,6 +6,7 @@ import { estate_getMyListings, estate_getMyListingsDefinition } from "./estate_g
 import { estate_getFavourites, estate_getFavouritesDefinition } from "./estate_getFavourites";
 import { estate_getLeadActivity, estate_getLeadActivityDefinition } from "./estate_getLeadActivity";
 import { estate_postLeadActivity, estate_postLeadActivityDefinition } from "./estate_postLeadActivity";
+import { estate_searchProperties, estate_searchPropertiesDefinition } from "./estate_searchProperties";
 
 export type ToolDefinition = {
   name: string;
@@ -43,6 +44,7 @@ export const contextTools: ToolDefinition[] = [
   estate_getMyLeadsDefinition,
   estate_getMyListingsDefinition,
   estate_getFavouritesDefinition,
+  estate_searchPropertiesDefinition,
   estate_getLeadActivityDefinition,
   estate_postLeadActivityDefinition,
 ];
@@ -79,6 +81,7 @@ export function executeContextTool({ name, authAccountToken, arguments: toolArgu
     case "estate_getMyLeads": return estate_getMyLeads(context);
     case "estate_getMyListings": return estate_getMyListings(context);
     case "estate_getFavourites": return estate_getFavourites(context);
+    case "estate_searchProperties": return estate_searchProperties(context);
     case "estate_getLeadActivity": return estate_getLeadActivity(context);
     case "estate_postLeadActivity": return estate_postLeadActivity(context);
     default: return Promise.reject(new Error(`Unknown context tool: ${name}`));

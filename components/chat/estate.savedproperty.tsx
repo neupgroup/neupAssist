@@ -51,11 +51,11 @@ export function EstateSavedProperty({ property: rawProperty }: { property: Prope
   const propertyId = readDisplayValue(property.propertyId) ?? readDisplayValue(property.id);
   const displayTitle = title === "Saved property" && propertyId ? `Property ${propertyId}` : title;
 
-  return <article className="mb-3 flex w-full max-w-[460px] items-center gap-3 rounded-[11px] border border-[#e6ebe4] bg-white p-[10px]">
-    {image
-      ? <Image className="h-[68px] w-[76px] shrink-0 rounded-lg object-cover" src={image} alt="" width={76} height={68} unoptimized />
-      : <span className="grid h-[68px] w-[76px] shrink-0 place-items-center rounded-lg bg-[#edf3ec] text-2xl text-[#5d7c63]" aria-hidden="true">⌂</span>}
-    <div className="grid min-w-0 gap-[2px]">
+  return <article className="mb-3 flex w-full max-w-[460px] items-center gap-3 rounded-[11px] bg-white p-0">
+    <span className="grid h-[88px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-[11px] border border-[#e6ebe4] bg-[#edf3ec] text-2xl text-[#5d7c63]" aria-hidden="true">
+      {image ? <Image className="block h-full w-full object-cover" src={image} alt="" width={96} height={88} unoptimized /> : "⌂"}
+    </span>
+    <div className="grid min-w-0 gap-[2px] p-3">
       <strong className="text-[15px] font-semibold text-[#435046]">{displayTitle}</strong>
       {price && <span className="text-[14px] font-semibold text-[#526e57]">{price}</span>}
       {(location || propertyType) && <span className="text-[14px] leading-[1.4] text-[#858f86]">{[propertyType, location].filter(Boolean).join(" · ")}</span>}
