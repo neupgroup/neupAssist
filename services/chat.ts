@@ -76,7 +76,37 @@ async function requestWithFallback(credentials: ResolvedCredential[], messages: 
 }
 
 /** Sends a chat through saved providers, falling back across up to five providers. */
-export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onContextRequest?: (request: string) => void, authAccountToken?: string | null) {
+export type ChatProgressEvent = { type: "personalizing" } | { type: "connecting" | "communicating"; app: string; logo: string | null };
+
+/** Sends app discovery and tool execution progress to the active chat stream. */
+type ChatProgressHandler = (event: ChatProgressEvent) => void;
+
+/** Finds the connected application identity shown beside chat progress. */
+async function getConnectedAppIdentity(accountId: string | undefined, fallbackName: string) {
+  if (!accountId) return { app: fallbackName, logo: null, id: undefined as string | undefined };
+  const integration = await prisma.integration.findFirst({
+    where: { account_id: accountId, status: "active" },
+    select: { application: { select: { id: true, name: true, displayImage: true } } },
+    orderBy: { addedOn: "desc" },
+  });
+  return integration?.application ? { app: integration.application.name, logo: integration.application.displayImage, id: integration.application.id } : { app: fallbackName, logo: null, id: undefined };
+}
+
+/** Records a redacted app communication event without interrupting chat on log failure. */
+async function logCallerEvent({ accountId, applicationId, log }: { accountId?: string; applicationId?: string; log: Record<string, unknown> }) {
+  try {
+    await prisma.callerLog.create({ data: {
+      account_id: accountId ?? null,
+      application_id: applicationId ?? null,
+      log: log as never,
+    } });
+  } catch (error) {
+    console.error("Could not record app communication log.", error);
+  }
+}
+
+/** Sends a chat through saved providers, falling back across up to five providers. */
+export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onProgress?: ChatProgressHandler, authAccountToken?: string | null) {
   await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null });
   let account: Awaited<ReturnType<typeof ensureAccount>> = null;
   try {
@@ -92,8 +122,18 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   const credentials = await prisma.intelligenceKey.findMany({ orderBy: { addedOn: "desc" }, select: { provider: true, model: true, key: true } });
   const fallbackCredentials = getFallbackCredentials(credentials);
   if (fallbackCredentials.length === 0) return { error: "Add an AI provider key in Manage keys to enable chat.", status: 409, setupRequired: true } as const;
+  onProgress?.({ type: "personalizing" });
   let requirementsTools: McpToolDefinition[] = [];
-  try { requirementsTools = await discoverRequirementsTools(authAccountToken); } catch { /* Keep chat available if the optional MCP server cannot be reached. */ }
+  const discoveryStartedAt = Date.now();
+  const appIdentity = await getConnectedAppIdentity(account?.id, "Neup Estate").catch(() => ({ app: "Neup Estate", logo: null, id: undefined }));
+  onProgress?.({ type: "connecting", ...appIdentity });
+  try {
+    requirementsTools = await discoverRequirementsTools(authAccountToken);
+    await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_discovery", application: appIdentity.app, outcome: "success", toolCount: requirementsTools.length, durationMs: Date.now() - discoveryStartedAt } });
+  } catch { /* Keep chat available if the optional MCP server cannot be reached. */ }
+  if (requirementsTools.length === 0) {
+    await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_discovery", application: appIdentity.app, outcome: authAccountToken?.trim() ? "empty_or_failed" : "skipped_unauthenticated", durationMs: Date.now() - discoveryStartedAt } });
+  }
   const requirementsToolNames = new Map<string, string>();
   const modelTools: ToolDefinition[] = [
     ...contextTools,
@@ -129,16 +169,26 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
           if (requirementsToolName) {
             const token = authAccountToken?.trim();
             if (!token) throw new Error("Sign in is required to use requirements tools.");
+            onProgress?.({ type: "communicating", ...appIdentity });
+            const startedAt = Date.now();
             const data = await callRequirementsTool(token, requirementsToolName, toolCall.arguments);
+            await logCallerEvent({ accountId: account?.id, applicationId: appIdentity.id, log: { phase: "tool_call", application: appIdentity.app, tool: requirementsToolName, argumentKeys: Object.keys(toolCall.arguments), outcome: "success", durationMs: Date.now() - startedAt } });
             const result = { name: toolCall.name, data, format: "JSON returned by the requirements MCP tool.", guidelines: "Use the returned requirements data to answer the user." };
             toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
             return { id: toolCall.id, ...result };
           }
+          const toolAppIdentity = await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined }));
+          onProgress?.({ type: "communicating", ...toolAppIdentity });
+          const startedAt = Date.now();
           const data = await executeContextTool({ name: toolCall.name, authAccountToken, arguments: toolCall.arguments });
+          await logCallerEvent({ accountId: account?.id, applicationId: toolAppIdentity.id, log: { phase: "tool_call", application: toolAppIdentity.app, tool: toolCall.name, argumentKeys: Object.keys(toolCall.arguments), outcome: "success", durationMs: Date.now() - startedAt } });
           const result = formatToolResult({ name: toolCall.name, data });
           toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
           return { id: toolCall.id, ...result };
         } catch (error) {
+          const app = requirementsToolNames.has(toolCall.name) ? appIdentity.app : "Personal";
+          const failedIdentity = requirementsToolNames.has(toolCall.name) ? appIdentity : await getConnectedAppIdentity(account?.id, "Personal").catch(() => ({ app: "Personal", logo: null, id: undefined }));
+          await logCallerEvent({ accountId: account?.id, applicationId: failedIdentity.id, log: { phase: "tool_call", application: app, tool: toolCall.name, outcome: "error", error: error instanceof Error ? error.message : "The context tool failed." } });
           return { id: toolCall.id, name: toolCall.name, error: error instanceof Error ? error.message : "The context tool failed." };
         }
       }));
@@ -152,7 +202,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
     if (!contextRequest) break;
     if (contextRequest) {
       requestInstructions.push(contextRequest);
-      onContextRequest?.(contextRequest);
+      onProgress?.({ type: "personalizing" });
       const context = await contextManager.collect(contextRequest, authAccountToken);
       requestMessages.push({ role: "assistant", content: text });
       requestMessages.push({ role: "user", content: `Context data for ${contextRequest}:\n${JSON.stringify(context)}` });

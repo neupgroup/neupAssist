@@ -19,8 +19,8 @@ export async function POST(request: Request) {
     async start(controller) {
       const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       try {
-        const result = await sendChat(input.messages as ChatMessage[], input.chatId as number | undefined, (contextRequest) => {
-          progressQueue.push(JSON.stringify({ type: "request", request: contextRequest }));
+        const result = await sendChat(input.messages as ChatMessage[], input.chatId as number | undefined, (progress) => {
+          progressQueue.push(JSON.stringify({ type: "progress", progress }));
           const pending = progressQueue.splice(0);
           for (const event of pending) controller.enqueue(encoder.encode(`${event}\n`));
         }, authAccountToken);

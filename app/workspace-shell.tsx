@@ -13,6 +13,7 @@ const navigation = [
   { href: "/api", label: "API", icon: "code" as const },
   { href: "/manage/keys", label: "Manage keys", icon: "key" as const },
   { href: "/manage/accounts", label: "Accounts", icon: "settings" as const },
+  { href: "/manage/logs", label: "Logs", icon: "search" as const },
   { href: "/apps", label: "Apps and Integrations", icon: "code" as const },
   { href: "/settings", label: "Settings", icon: "settings" as const },
 ];

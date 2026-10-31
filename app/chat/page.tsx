@@ -11,6 +11,7 @@ import VoiceAssistant from "@/components/voice/voice-assistant";
 
 type ToolFormatHint = { name: string; format: string; guidelines: string };
 type Message = { role: "user" | "assistant"; text: string; toolFormats?: ToolFormatHint[] };
+type RequestProgress = { type: "personalizing" } | { type: "connecting" | "communicating"; app: string; logo: string | null };
 
 function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}) {
   const searchParams = useSearchParams();
@@ -20,8 +21,7 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
-  const [requestProgress, setRequestProgress] = useState(0);
-  const [requestDetails, setRequestDetails] = useState<{ app: string; items: string } | null>(null);
+  const [requestProgress, setRequestProgress] = useState<RequestProgress | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState("");
@@ -64,8 +64,7 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
     setMessages(conversation);
     setDraft("");
     setSending(true);
-    setRequestProgress(0);
-    setRequestDetails(null);
+    setRequestProgress(null);
     setError("");
     setSetupRequired(false);
     if (inputRef.current) inputRef.current.style.height = "auto";
@@ -84,13 +83,9 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line) continue;
-          const event = JSON.parse(line) as { type: string; request?: string; result?: Record<string, unknown>; error?: string; setupRequired?: boolean };
-          if (event.type === "request" && event.request) {
-            const parts = event.request.replace(/^--req\.?|--$/g, "").split(".").filter(Boolean);
-            const app = parts[0] === "estate" ? "your estate app" : parts[0] === "personal" ? "your personal app" : "your connected apps";
-            setRequestDetails({ app, items: parts.slice(1).join(", ") || "information" });
-            setRequestProgress(2);
-          } else if (event.type === "final") result = event.result ?? null;
+          const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean };
+          if (event.type === "progress" && event.progress) setRequestProgress(event.progress);
+          else if (event.type === "final") result = event.result ?? null;
           else if (event.type === "error") { if (event.setupRequired) setSetupRequired(true); throw new Error(event.error || "Nia couldn’t complete that request."); }
         }
       }
@@ -119,7 +114,11 @@ function ChatConversationPage({ initialChatId }: { initialChatId?: number } = {}
       </div> : <div className="message-list">{messages.map((message, index) => <article className={`message message-${message.role}`} key={`${index}-${message.role}`}>
         {message.role === "assistant" ? <span className="message-avatar"><Icon name="sparkles" size={20} /></span> : <span className="user-message-label">You</span>}
         <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{message.text}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
-      </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={20} /></span><div className="message-body"><p key={`${requestProgress}-${requestDetails?.app ?? ""}`} className={requestProgress ? "request-status" : ""} aria-live="polite">{requestProgress === 0 ? "Nia is thinking…" : requestProgress === 1 ? `Nia is collecting information from ${requestDetails?.app ?? "your connected apps"} to respond to you.` : `Nia is collecting ${requestDetails?.items ?? "information"} from ${requestDetails?.app ?? "your connected apps"} to respond to you.`}</p></div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
+      </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={20} /></span><div className="message-body" aria-live="polite" aria-atomic="true">
+        {!requestProgress && <p className="request-status">Nia is thinking…</p>}
+        {requestProgress?.type === "personalizing" && <p className="request-status">Please wait while I personalize results for you.</p>}
+        {(requestProgress?.type === "connecting" || requestProgress?.type === "communicating") && <div className="app-request-status request-status"><span className="app-request-logo">{requestProgress.logo ? <img src={requestProgress.logo} alt="" /> : <Icon name="code" size={16} />}</span><span>{requestProgress.type === "connecting" ? "Connecting to" : "Communicating to"} <strong>{requestProgress.app}</strong></span></div>}
+      </div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign("/manage/keys")}>Manage provider keys</Button>}</div>}</div>}
     </div>
     <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>
       <Textarea ref={inputRef} value={draft} onChange={(event) => { setDraft(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />

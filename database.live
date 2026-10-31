@@ -55,3 +55,11 @@ Fields:
 > auth_info: string(2048);
 > status: string, default: active;
 > addedOn: timestamp, default: current timestamp;
+
+Table: callerLogs, Model: CallerLog
+Fields:
+> id: int, auto incremental;
+> account_id: string, nullable, references accounts.id;
+> application_id: uuid, nullable, references applications.id;
+> log: jsonb;
+> timestamp: timestamp, default: current timestamp;

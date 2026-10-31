@@ -96,6 +96,10 @@
 .message-user .message-body { max-width: 80%; padding: 12px 15px; border-radius: 14px 14px 4px 14px; background: #eaf0e9; color: #3b4a40; }
 .message-body p { margin: 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
 .request-status { animation: request-status-in .3s ease both; }
+.app-request-status { display: flex; align-items: center; gap: 9px; color: #68746b; font-size: 14px; }
+.app-request-status strong { color: #465349; font-weight: 600; }
+.app-request-logo { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; overflow: hidden; border: 1px solid #e3eae1; border-radius: 8px; background: #fff; color: #62816a; }
+.app-request-logo img { width: 100%; height: 100%; object-fit: cover; }
 @keyframes request-status-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .request-status { animation: none; } }
 .user-message-label { align-self: flex-start; padding-top: 8px; color: #8a958c; font-size: 13px; }

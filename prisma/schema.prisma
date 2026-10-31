@@ -42,6 +42,7 @@ model Account {
   chats        Chat[]
   messages     Message[]
   integrations Integration[]
+  callerLogs   CallerLog[]
 
   @@map("accounts")
 }
@@ -84,6 +85,7 @@ model Application {
   displayImage  String?
   coverImage    String?
   integrations  Integration[]
+  callerLogs    CallerLog[]
 
   @@map("applications")
 }
@@ -101,4 +103,18 @@ model Integration {
   @@index([application_id])
   @@index([account_id])
   @@map("integrations")
+}
+
+model CallerLog {
+  id             Int          @id @default(autoincrement())
+  account_id     String?
+  account        Account?     @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  application_id String?      @db.Uuid
+  application    Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  log            Json         @db.JsonB
+  timestamp      DateTime     @default(now()) @db.Timestamp(3)
+
+  @@index([account_id, timestamp])
+  @@index([application_id, timestamp])
+  @@map("callerLogs")
 }
