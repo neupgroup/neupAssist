@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { ensureAccount } from "@/services/account";
+import { ensureAccount } from "@neup/shared/account/self";
 import { listConnectedChatApps } from "@/services/chat";
 import { logApplicationError } from "@/app/server-logger";
 

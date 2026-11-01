@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { prisma } from "@/prisma/client/server";
-import { ensureAccount } from "@/services/account";
+import { prisma } from "@neup/core/database/prisma";
+import { ensureAccount } from "@neup/shared/account/self";
 
 /** Connects the signed-in account to an application using its existing catalog record. */
 export async function connectApplication(formData: FormData) {

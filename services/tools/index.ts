@@ -1,6 +1,6 @@
 import "server-only";
-import { prisma } from "@/prisma/client/server";
-import { ensureAccount } from "@/services/account";
+import { prisma } from "@neup/core/database/prisma";
+import { ensureAccount } from "@neup/shared/account/self";
 import { discoverMcpTools, getApplicationMcpEndpoints } from "@/services/mcp/client";
 import { personal_getBasics, personal_getBasicsDefinition } from "./personal_getBasics";
 import { personal_getNotifications, personal_getNotificationsDefinition } from "./personal_getNotifications";

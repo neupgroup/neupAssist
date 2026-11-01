@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { ensureAccount } from "@/services/account";
+import { ensureAccount } from "@neup/shared/account/self";
 import { getRecentChat, listConnectedChatApps } from "@/services/chat";
 import ChatPage from "../page";
 

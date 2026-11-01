@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { prisma } from "@/prisma/client/server";
-import { ensureAccount } from "@/services/account";
+import { prisma } from "@neup/core/database/prisma";
+import { ensureAccount } from "@neup/shared/account/self";
 import { discoverMcpTools, type McpToolDefinition } from "@/services/mcp/client";
 import { connectApplication } from "./connect-action";
 

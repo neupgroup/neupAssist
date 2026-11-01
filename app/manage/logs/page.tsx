@@ -1,4 +1,4 @@
-import { prisma } from "@/prisma/client/server";
+import { prisma } from "@neup/core/database/prisma";
 
 export const dynamic = "force-dynamic";
 

@@ -1,12 +1,12 @@
 import "server-only";
-import { prisma } from "@/prisma/client/server";
+import { prisma } from "@neup/core/database/prisma";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
 import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
 import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
 import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpToolDefinition } from "@/services/mcp/client";
-import { ensureAccount } from "@/services/account";
+import { ensureAccount } from "@neup/shared/account/self";
 
 /** Lists the most recently updated chats. */
 export async function listChats() {

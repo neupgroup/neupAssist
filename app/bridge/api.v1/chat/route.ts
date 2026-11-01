@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { logApplicationError } from "../../server-logger";
-import { sendChat, type ChatMessage } from "../../../services/chat";
+import { logApplicationError } from "@/app/server-logger";
+import { sendChat, type ChatMessage } from "@/services/chat";
 
 export const runtime = "nodejs";
 

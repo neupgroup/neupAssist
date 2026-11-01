@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { Prisma } from "@/prisma/client";
-import { prisma } from "@/prisma/client/server";
+import type { Prisma } from "@neup/core/database/prisma";
+import { prisma } from "@neup/core/database/prisma";
 
 export type CreateApplicationState = { error?: string };
 

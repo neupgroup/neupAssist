@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/prisma/client/server";
+import { prisma } from "@neup/core/database/prisma";
 import { Icon } from "@/app/ui-icon";
 import EditApplicationForm from "./edit-application-form";
 

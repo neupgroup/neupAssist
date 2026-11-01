@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "../prisma/client/server";
+import { prisma } from "@neup/core/database/prisma";
 import { logServiceRun } from "@/services/service-logger";
 
 export const listKeys = async () => {

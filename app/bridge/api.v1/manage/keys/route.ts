@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { logApplicationError } from "../../../server-logger";
-import { prisma } from "../../../../prisma/client/server";
+import { logApplicationError } from "@/app/server-logger";
+import { prisma } from "@neup/core/database/prisma";
 
 export const runtime = "nodejs";
 

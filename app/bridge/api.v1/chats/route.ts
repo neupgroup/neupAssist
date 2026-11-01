@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { logApplicationError } from "../../server-logger";
-import { ensureAccount } from "../../../services/account";
-import { deleteAllAccountChats, deleteChat, getChat, listChats } from "../../../services/chat";
+import { logApplicationError } from "@/app/server-logger";
+import { ensureAccount } from "@neup/shared/account/self";
+import { deleteAllAccountChats, deleteChat, getChat, listChats } from "@/services/chat";
 
 export const runtime = "nodejs";
 

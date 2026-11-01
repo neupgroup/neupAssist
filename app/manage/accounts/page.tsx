@@ -1,6 +1,6 @@
-import { prisma } from "@/prisma/client/server";
+import { prisma } from "@neup/core/database/prisma";
 import { getCookie } from "@neup/core/helpers/cookie";
-import { ensureAccount } from "@/services/account";
+import { ensureAccount } from "@neup/shared/account/self";
 
 export const dynamic = "force-dynamic";
 
