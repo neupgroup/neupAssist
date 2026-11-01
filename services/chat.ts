@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@neup/core/database/prisma";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
-import { requestModel, type ModelResponse } from "@/services/models";
+import { requestModel } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
 import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
@@ -79,7 +79,6 @@ type SavedCredential = {
 type ResolvedCredential = SavedCredential & { model: string };
 
 const CHAT_REQUEST_ATTEMPTS = 5;
-const CHAT_FAILURE_REPLY = "Could not complete the request because of an error. Please try again.";
 
 /** Resolves provider defaults and returns at most one credential per provider. */
 function getFallbackCredentials(credentials: SavedCredential[]): ResolvedCredential[] {
@@ -126,7 +125,7 @@ async function requestChatResponse(credentials: ResolvedCredential[], messages: 
       const attempt = await requestWithFallback(credentials, messages, tools);
       if ("error" in attempt.result) {
         lastError = new Error(attempt.result.error);
-      } else if (attempt.result.output.trim()) {
+      } else if (attempt.result.toolCalls?.length || attempt.result.output.trim()) {
         return { result: attempt.result, provider: attempt.provider, model: attempt.model, exhausted: false } as const;
       } else {
         lastError = new Error("The AI provider returned an empty response.");
@@ -142,10 +141,7 @@ async function requestChatResponse(credentials: ResolvedCredential[], messages: 
 
   await logApplicationError(lastError, `POST /api/chat exhausted after ${CHAT_REQUEST_ATTEMPTS} attempts`);
   return {
-    result: { output: CHAT_FAILURE_REPLY } as Extract<ModelResponse, { output: string }>,
-    provider: credentials[0]?.provider ?? "",
-    model: credentials[0]?.model ?? "",
-    exhausted: true,
+    error: lastError instanceof Error ? lastError.message : "The configured AI providers could not complete the request.",
   } as const;
 }
 
@@ -339,10 +335,10 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: string
   let model = fallbackCredentials[0].model!;
   for (let turn = 0; turn < 6; turn += 1) {
     const attempt = await requestChatResponse(fallbackCredentials, requestMessages, modelTools);
+    if ("error" in attempt) return { error: attempt.error, status: 503 } as const;
     provider = attempt.provider;
     model = attempt.model;
     text = attempt.result.output;
-    if (attempt.exhausted) break;
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {

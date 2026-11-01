@@ -3,6 +3,7 @@ import { getCookie } from "@neup/core/helpers/cookie";
 import { ensureAccount } from "@neup/shared/account/self";
 import { logApplicationError } from "@/app/server-logger";
 import { listChatMessages, sendChat } from "@/services/chat";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const limit = getPaginationValue(url.searchParams.get("limit"), 20, 100);
     const offset = getPaginationValue(url.searchParams.get("offset"), 0, 1000000);
     if (limit === null || offset === null) return NextResponse.json({ error: "Limit and offset must be non-negative integers." }, { status: 400 });
-    const account = await ensureAccount(await getCookie("auth_account"));
+    const authToken = await getPublicAccountToken(getCookie, request);
+    const account = await ensureAccount(authToken);
     const result = await listChatMessages(id, account?.id, limit, offset);
     return result ? NextResponse.json(result) : NextResponse.json({ error: "Chat was not found." }, { status: 404 });
   } catch (error) {
@@ -48,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     if (!isChatUuid(id)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
-    const authToken = await getCookie("auth_account");
+    const authToken = await getPublicAccountToken(getCookie, request);
     const account = await ensureAccount(authToken);
     const ownedChat = await listChatMessages(id, account?.id, 1, 0);
     if (!ownedChat) return NextResponse.json({ error: "Chat was not found." }, { status: 404 });

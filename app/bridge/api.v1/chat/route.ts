@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { logApplicationError } from "@/app/server-logger";
 import { sendChat, type ChatMessage } from "@/services/chat";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   if (!isPendingRetry && (!Array.isArray(input.messages) || input.messages.length === 0 || input.messages.length > 100 || input.messages.some((message) => !message || typeof message !== "object" || !["user", "assistant"].includes((message as ChatMessage).role) || typeof (message as ChatMessage).content !== "string"))) return NextResponse.json({ error: "Send a conversation containing user and assistant messages." }, { status: 400 });
   if (input.chatId !== undefined && !isChatUuid(input.chatId)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
   const encoder = new TextEncoder();
-  const authAccountToken = await getCookie("auth_account");
+  const authAccountToken = await getPublicAccountToken(getCookie, request);
   const progressQueue: string[] = [];
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

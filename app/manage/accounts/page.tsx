@@ -1,6 +1,7 @@
 import { prisma } from "@neup/core/database/prisma";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { ensureAccount } from "@neup/shared/account/self";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ async function loadAccounts(): Promise<{ accounts: AccountEntry[]; total: number
 /** Shows account records currently stored in the application database. */
 export default async function ManageAccountsPage() {
   try {
-    const account = await ensureAccount(await getCookie("auth_account"));
+    const account = await ensureAccount(await getPublicAccountToken(getCookie));
     if (account) {
       await prisma.chat.updateMany({ where: { account_id: null }, data: { account_id: account.id } });
       await prisma.message.updateMany({

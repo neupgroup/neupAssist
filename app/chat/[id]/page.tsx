@@ -3,6 +3,7 @@ import { getCookie } from "@neup/core/helpers/cookie";
 import { ensureAccount } from "@neup/shared/account/self";
 import { getRecentChat, listConnectedChatApps } from "@/services/chat";
 import ChatPage from "../page";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export default async function SavedChatPage({ params }: { params: Promise<{ id: 
   const { id: rawId } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawId)) notFound();
 
-  const account = await ensureAccount(await getCookie("auth_account"));
+  const account = await ensureAccount(await getPublicAccountToken(getCookie));
   const chat = await getRecentChat(rawId, 10);
   if (!chat) notFound();
   const apps = await listConnectedChatApps(account?.id);

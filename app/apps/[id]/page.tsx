@@ -5,6 +5,7 @@ import { prisma } from "@neup/core/database/prisma";
 import { ensureAccount } from "@neup/shared/account/self";
 import { discoverMcpTools, type McpToolDefinition } from "@/services/mcp/client";
 import { connectApplication } from "./connect-action";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ function addMcpEndpoint(endpoints: Map<string, { name: string; url: string }>, n
 /** Loads an application and its integrations for the signed-in account. */
 async function loadApplication(id: string) {
   try {
-    const authAccountToken = await getCookie("auth_account");
+    const authAccountToken = await getPublicAccountToken(getCookie);
     const account = await ensureAccount(authAccountToken);
     const application = await prisma.application.findUnique({
       where: { id },

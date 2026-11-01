@@ -2,6 +2,7 @@ import { getCookie } from "@neup/core/helpers/cookie";
 import Link from "next/link";
 import { ensureAccount } from "@neup/shared/account/self";
 import { prisma } from "@neup/core/database/prisma";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ type AppsPageData = {
 /** Loads the application directory and IDs installed by the current account. */
 async function loadAppsPageData(): Promise<AppsPageData> {
   try {
-    const account = await ensureAccount(await getCookie("auth_account"));
+    const account = await ensureAccount(await getPublicAccountToken(getCookie));
     const [applications, integrations] = await Promise.all([
       prisma.application.findMany({
         select: {

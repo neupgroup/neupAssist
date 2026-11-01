@@ -28,16 +28,35 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [deletingChat, setDeletingChat] = useState(false);
 
   useEffect(() => {
-    const loadChats = () => chatClientService.list()
-      .then(async (response) => {
+    let isMounted = true;
+    let isLoading = false;
+
+    /** Refreshes the recent conversation list without discarding it on transient errors. */
+    const loadChats = async () => {
+      if (isLoading) return;
+      isLoading = true;
+      try {
+        const response = await chatClientService.list();
         if (!response.ok) return;
         const result = await response.json();
-        if (Array.isArray(result)) setChats(result);
-      })
-      .catch(() => setChats([]));
+        if (isMounted && Array.isArray(result.chats)) setChats(result.chats);
+      } catch {
+        // Keep the current list visible while the network is unavailable.
+      } finally {
+        isLoading = false;
+      }
+    };
+
     void loadChats();
+    const refreshInterval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadChats();
+    }, 15_000);
     window.addEventListener("chats-updated", loadChats);
-    return () => window.removeEventListener("chats-updated", loadChats);
+    return () => {
+      isMounted = false;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("chats-updated", loadChats);
+    };
   }, []);
 
   /** Deletes a saved conversation and returns to chat if it is open. */

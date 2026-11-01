@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCookie } from "@neup/core/helpers/cookie";
 import { prisma } from "@neup/core/database/prisma";
 import { ensureAccount } from "@neup/shared/account/self";
+import { getPublicAccountToken } from "@/services/request/auth";
 
 /** Connects the signed-in account to an application using its existing catalog record. */
 export async function connectApplication(formData: FormData) {
@@ -14,7 +15,7 @@ export async function connectApplication(formData: FormData) {
 
   const application = await prisma.application.findUnique({ where: { id }, select: { id: true } });
   if (!application) redirect("/apps");
-  const account = await ensureAccount(await getCookie("auth_account"));
+  const account = await ensureAccount(await getPublicAccountToken(getCookie));
   if (!account) redirect(`${destination}?connect=signin`);
 
   const existing = await prisma.integration.findFirst({
