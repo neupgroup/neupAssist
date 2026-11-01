@@ -3,6 +3,7 @@ import { getCookie } from "@neup/core/helpers/cookie";
 import { logApplicationError } from "@/app/server-logger";
 import { sendChat, type ChatMessage } from "@/services/chat";
 import { getPublicAccountToken } from "@/services/request/auth";
+import { ensureAccount } from "@neup/shared/account/self";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   if (input.chatId !== undefined && !isChatUuid(input.chatId)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
   const encoder = new TextEncoder();
   const authAccountToken = await getPublicAccountToken(getCookie, request);
+  if (!await ensureAccount(authAccountToken)) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
   const progressQueue: string[] = [];
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

@@ -39,17 +39,17 @@ export async function listChatMessages(chatId: string, accountId: string | undef
 }
 
 /** Loads a chat and converts stored messages to the conversation format. */
-export async function getChat(chatId: string) {
+export async function getChat(chatId: string, accountId: string) {
   await logServiceRun("chat.get", { chatId });
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "asc" }, { id: "asc" }], select: { type: true, content: true } } } });
+  const chat = await prisma.chat.findFirst({ where: { id: chatId, account_id: accountId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "asc" }, { id: "asc" }], select: { type: true, content: true } } } });
   if (!chat) return null;
   return { id: chat.id, title: chat.title, status: chat.status, messages: chat.messages.map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }
 
 /** Loads the latest messages needed to render a saved chat on the server. */
-export async function getRecentChat(chatId: string, messageLimit = 10) {
+export async function getRecentChat(chatId: string, accountId: string, messageLimit = 10) {
   await logServiceRun("chat.get_recent", { chatId, messageLimit });
-  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
+  const chat = await prisma.chat.findFirst({ where: { id: chatId, account_id: accountId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
   if (!chat) return null;
   return { id: chat.id, title: chat.title, status: chat.status, messages: chat.messages.reverse().map((message) => ({ role: message.type === "userSent" ? "user" as const : "assistant" as const, text: message.content })) };
 }

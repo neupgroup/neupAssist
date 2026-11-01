@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (limit === null || offset === null) return NextResponse.json({ error: "Limit and offset must be non-negative integers." }, { status: 400 });
     const authToken = await getPublicAccountToken(getCookie, request);
     const account = await ensureAccount(authToken);
+    if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const result = await listChatMessages(id, account?.id, limit, offset);
     return result ? NextResponse.json(result) : NextResponse.json({ error: "Chat was not found." }, { status: 404 });
   } catch (error) {
@@ -52,6 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!isChatUuid(id)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
     const authToken = await getPublicAccountToken(getCookie, request);
     const account = await ensureAccount(authToken);
+    if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const ownedChat = await listChatMessages(id, account?.id, 1, 0);
     if (!ownedChat) return NextResponse.json({ error: "Chat was not found." }, { status: 404 });
 

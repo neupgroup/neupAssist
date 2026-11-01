@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const offset = getPaginationValue(url.searchParams.get("offset"), 0, 1000000);
     if (limit === null || offset === null) return NextResponse.json({ error: "Limit and offset must be non-negative integers." }, { status: 400 });
     const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     return NextResponse.json(await listChats(account?.id, limit, offset));
   }
   catch (error) { await logApplicationError(error, "GET /api/chats"); return NextResponse.json({ error: "Could not load saved chats." }, { status: 503 }); }
@@ -36,9 +37,18 @@ export async function POST(request: Request) {
     let body: unknown = {};
     try { body = await request.json(); } catch { /* An empty request creates a default titled chat. */ }
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Request body must be a JSON object." }, { status: 400 });
-    const title = (body as { title?: unknown }).title;
-    if (title !== undefined && typeof title !== "string") return NextResponse.json({ error: "Title must be a string." }, { status: 400 });
+    const input = body as { title?: unknown; chatId?: unknown };
     const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
+
+    if (input.chatId !== undefined) {
+      if (!isChatUuid(input.chatId)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
+      const chat = await getChat(input.chatId, account.id);
+      return chat ? NextResponse.json(chat) : NextResponse.json({ error: "Chat was not found." }, { status: 404 });
+    }
+
+    const title = input.title;
+    if (title !== undefined && typeof title !== "string") return NextResponse.json({ error: "Title must be a string." }, { status: 400 });
     return NextResponse.json(await createChat(account?.id, title as string | undefined), { status: 201 });
   } catch (error) {
     await logApplicationError(error, "POST /api/chats");
@@ -55,8 +65,12 @@ export async function DELETE(request: Request) {
       const deleted = await deleteAllAccountChats(account.id);
       return NextResponse.json({ deleted });
     }
+    const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const chatId = url.searchParams.get("id");
     if (!isChatUuid(chatId)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
+    const chat = await getChat(chatId, account.id);
+    if (!chat) return NextResponse.json({ error: "Saved chat was not found." }, { status: 404 });
     const deleted = await deleteChat(chatId);
     return deleted ? NextResponse.json({ id: chatId }) : NextResponse.json({ error: "Saved chat was not found." }, { status: 404 });
   } catch (error) { await logApplicationError(error, "DELETE /api/chats"); return NextResponse.json({ error: "Could not delete saved chat." }, { status: 503 }); }

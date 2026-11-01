@@ -13,7 +13,8 @@ export default async function SavedChatPage({ params }: { params: Promise<{ id: 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawId)) notFound();
 
   const account = await ensureAccount(await getPublicAccountToken(getCookie));
-  const chat = await getRecentChat(rawId, 10);
+  if (!account) notFound();
+  const chat = await getRecentChat(rawId, account.id, 10);
   if (!chat) notFound();
   const apps = await listConnectedChatApps(account?.id);
 
