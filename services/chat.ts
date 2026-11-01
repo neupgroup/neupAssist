@@ -255,7 +255,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
       return {
         name,
         description: `${application.app}: ${tool.description}`,
-        parameters: { type: "object", properties: tool.inputSchema.properties ?? {}, required: tool.inputSchema.required ?? [] },
+        parameters: { type: "object" as const, properties: tool.inputSchema.properties ?? {}, required: tool.inputSchema.required ?? [] },
         format: `Structured data returned by ${application.app}; summarize it in readable Markdown, never raw JSON.`,
         guidelines: `Summarize the returned ${application.app} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
       };

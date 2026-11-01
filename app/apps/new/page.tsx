@@ -6,9 +6,9 @@ import { Button } from "@neup/components/ui/button";
 import { Input } from "@neup/components/ui/input";
 import { Textarea } from "@neup/components/ui/textarea";
 import { Icon } from "@/app/ui-icon";
-import { createApplication } from "./actions";
+import { createApplication, type CreateApplicationState } from "./actions";
 
-const initialState = {};
+const initialState: CreateApplicationState = {};
 
 /** Renders the form for adding an application to the catalog. */
 export default function NewApplicationPage() {
