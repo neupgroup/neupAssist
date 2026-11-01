@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: "/nia"
+  basePath: "/assist"
 };
 
 export default nextConfig;
