@@ -215,6 +215,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
           if (event.type === "progress" && event.progress) setRequestProgress(event.progress);
           else if (event.type === "saved" && event.chatId) {
             setChatId(event.chatId);
+            window.history.replaceState(null, "", withAppBasePath(`/chat/${event.chatId}`));
             window.dispatchEvent(new Event("chats-updated"));
           }
           else if (event.type === "final") result = event.result ?? null;
@@ -223,6 +224,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
       }
       if (!result) throw new Error("Nia couldn’t complete that request.");
       setChatId(result.chatId as string);
+      window.history.replaceState(null, "", withAppBasePath(`/chat/${result.chatId as string}`));
       if (typeof result.reply === "string" && result.reply.trim()) {
         setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
       } else {
