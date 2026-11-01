@@ -11,7 +11,6 @@ import { Icon } from "./ui-icon";
 
 const navigation = [
   { href: "/chat", label: "Chat", icon: "chat" as const },
-  { href: "/api", label: "API", icon: "code" as const },
   { href: "/manage/keys", label: "Manage keys", icon: "key" as const },
   { href: "/manage/accounts", label: "Accounts", icon: "settings" as const },
   { href: "/manage/logs", label: "Logs", icon: "search" as const },
