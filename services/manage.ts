@@ -32,7 +32,7 @@ export async function saveKey(data: Record<string, unknown>) {
   return { ...created, balance: created.balance?.toString() ?? null };
 }
 
-export const deleteKey = async (id: number) => {
+export const deleteKey = async (id: string) => {
   await logServiceRun("manage.keys.delete", { id });
   await prisma.intelligenceKey.delete({ where: { id } });
   return { success: true };

@@ -1,12 +1,13 @@
 import "server-only";
 import { prisma } from "@neup/core/database/prisma";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
-import { requestModel } from "@/services/models";
+import { requestModel, type ModelResponse } from "@/services/models";
 import { defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
 import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
 import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpToolDefinition } from "@/services/mcp/client";
 import { ensureAccount } from "@neup/shared/account/self";
+import { logApplicationError } from "@/app/server-logger";
 
 /** Lists the most recently updated chats. */
 export async function listChats() {
@@ -15,7 +16,7 @@ export async function listChats() {
 }
 
 /** Loads a chat and converts stored messages to the conversation format. */
-export async function getChat(chatId: number) {
+export async function getChat(chatId: string) {
   await logServiceRun("chat.get", { chatId });
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "asc" }, { id: "asc" }], select: { type: true, content: true } } } });
   if (!chat) return null;
@@ -23,7 +24,7 @@ export async function getChat(chatId: number) {
 }
 
 /** Loads the latest messages needed to render a saved chat on the server. */
-export async function getRecentChat(chatId: number, messageLimit = 10) {
+export async function getRecentChat(chatId: string, messageLimit = 10) {
   await logServiceRun("chat.get_recent", { chatId, messageLimit });
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { id: true, title: true, status: true, messages: { orderBy: [{ sent_on: "desc" }, { id: "desc" }], take: messageLimit, select: { type: true, content: true } } } });
   if (!chat) return null;
@@ -31,7 +32,7 @@ export async function getRecentChat(chatId: number, messageLimit = 10) {
 }
 
 /** Deletes a saved chat and its related messages. */
-export async function deleteChat(chatId: number) {
+export async function deleteChat(chatId: string) {
   await logServiceRun("chat.delete", { chatId });
   const result = await prisma.chat.deleteMany({ where: { id: chatId } });
   return result.count > 0;
@@ -53,6 +54,9 @@ type SavedCredential = {
 };
 
 type ResolvedCredential = SavedCredential & { model: string };
+
+const CHAT_REQUEST_ATTEMPTS = 5;
+const CHAT_FAILURE_REPLY = "Could not complete the request because of an error. Please try again.";
 
 /** Resolves provider defaults and returns at most one credential per provider. */
 function getFallbackCredentials(credentials: SavedCredential[]): ResolvedCredential[] {
@@ -90,6 +94,38 @@ async function requestWithFallback(credentials: ResolvedCredential[], messages: 
   } as const;
 }
 
+/** Retries failed or empty model responses before returning a safe chat fallback. */
+async function requestChatResponse(credentials: ResolvedCredential[], messages: ChatMessage[], tools: ToolDefinition[]) {
+  let lastError: unknown = new Error("The AI provider returned no response.");
+
+  for (let attemptNumber = 1; attemptNumber <= CHAT_REQUEST_ATTEMPTS; attemptNumber += 1) {
+    try {
+      const attempt = await requestWithFallback(credentials, messages, tools);
+      if ("error" in attempt.result) {
+        lastError = new Error(attempt.result.error);
+      } else if (attempt.result.output.trim()) {
+        return { result: attempt.result, provider: attempt.provider, model: attempt.model, exhausted: false } as const;
+      } else {
+        lastError = new Error("The AI provider returned an empty response.");
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attemptNumber < CHAT_REQUEST_ATTEMPTS) {
+      await logApplicationError(lastError, `POST /api/chat attempt ${attemptNumber}/${CHAT_REQUEST_ATTEMPTS}`);
+    }
+  }
+
+  await logApplicationError(lastError, `POST /api/chat exhausted after ${CHAT_REQUEST_ATTEMPTS} attempts`);
+  return {
+    result: { output: CHAT_FAILURE_REPLY } as Extract<ModelResponse, { output: string }>,
+    provider: credentials[0]?.provider ?? "",
+    model: credentials[0]?.model ?? "",
+    exhausted: true,
+  } as const;
+}
+
 /** Sends a chat through saved providers, falling back across up to five providers. */
 export type ChatProgressEvent = { type: "personalizing" } | { type: "connecting" | "communicating"; app: string; logo: string | null };
 
@@ -97,7 +133,7 @@ export type ChatProgressEvent = { type: "personalizing" } | { type: "connecting"
 type ChatProgressHandler = (event: ChatProgressEvent) => void;
 
 /** Persists the new user message before any provider or application request starts. */
-async function persistUserMessage(content: string, requestedChatId: number | undefined, accountId: string | undefined) {
+async function persistUserMessage(content: string, requestedChatId: string | undefined, accountId: string | undefined) {
   const title = content.replace(/@@\{\{\{[^{}]+\}\}\}/g, "@app").trim().slice(0, 120) || "New chat";
   return prisma.$transaction(async (transaction) => {
     const chat = requestedChatId === undefined
@@ -109,7 +145,7 @@ async function persistUserMessage(content: string, requestedChatId: number | und
 }
 
 /** Persists the assistant response after the provider finishes. */
-async function persistAssistantMessage(chatId: number, content: string) {
+async function persistAssistantMessage(chatId: string, content: string) {
   if (!content.trim()) return false;
   await prisma.$transaction(async (transaction) => {
     await transaction.message.create({ data: { chat_id: chatId, type: "intelligenceReply", content } });
@@ -182,7 +218,7 @@ async function logCallerEvent({ accountId, applicationId, log }: { accountId?: s
 }
 
 /** Sends a chat through saved providers, falling back across up to five providers. */
-export async function sendChat(messages: ChatMessage[], requestedChatId?: number, onProgress?: ChatProgressHandler, authAccountToken?: string | null, onChatSaved?: (chatId: number) => void, retryPending = false) {
+export async function sendChat(messages: ChatMessage[], requestedChatId?: string, onProgress?: ChatProgressHandler, authAccountToken?: string | null, onChatSaved?: (chatId: string) => void, retryPending = false) {
   await logServiceRun("chat.send", { messageCount: messages.length, requestedChatId: requestedChatId ?? null, retryPending });
   let requestMessages = messages;
   let latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
@@ -279,11 +315,11 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: number
   let provider = fallbackCredentials[0].provider;
   let model = fallbackCredentials[0].model!;
   for (let turn = 0; turn < 6; turn += 1) {
-    const attempt = await requestWithFallback(fallbackCredentials, requestMessages, modelTools);
-    if ("error" in attempt.result) return { ...attempt.result, provider: attempt.provider, model: attempt.model } as const;
+    const attempt = await requestChatResponse(fallbackCredentials, requestMessages, modelTools);
     provider = attempt.provider;
     model = attempt.model;
     text = attempt.result.output;
+    if (attempt.exhausted) break;
     if (attempt.result.toolCalls?.length) {
       const toolResults = await Promise.all(attempt.result.toolCalls.map(async (toolCall) => {
         try {

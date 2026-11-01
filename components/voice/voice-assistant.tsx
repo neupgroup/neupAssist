@@ -17,7 +17,7 @@ function getRequestStatus(request: string) {
   return `Nia is collecting ${items} from ${app} to respond to you.`;
 }
 
-export default function VoiceAssistant({ initialChatId }: { initialChatId?: number } = {}) {
+export default function VoiceAssistant({ initialChatId }: { initialChatId?: string } = {}) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -29,7 +29,7 @@ export default function VoiceAssistant({ initialChatId }: { initialChatId?: numb
   const [conversationReady, setConversationReady] = useState(!initialChatId);
   const recognition = useRef<Recognition | null>(null);
   const orbRef = useRef<HTMLDivElement>(null);
-  const chatId = useRef<number | null>(null);
+  const chatId = useRef<string | null>(null);
   const messages = useRef<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const transcriptRef = useRef("");
   const sendingRef = useRef(false);
@@ -255,7 +255,7 @@ export default function VoiceAssistant({ initialChatId }: { initialChatId?: numb
         }
       }
       if (!result) throw new Error("Nia couldn’t complete that request.");
-      chatId.current = result.chatId as number;
+      chatId.current = result.chatId as string;
       const visibleReply = result.reply as string;
       const nextMessages = [...messages.current, { role: "user" as const, content }];
       messages.current = [...nextMessages, { role: "assistant", content: visibleReply }];

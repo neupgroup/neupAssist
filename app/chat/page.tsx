@@ -62,11 +62,11 @@ function renderUserMessage(text: string, apps: ChatApp[]): ReactNode[] {
   return nodes;
 }
 
-function ChatConversationPage({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
+function ChatConversationPage({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: string; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   const requestedChatId = initialChatId ? String(initialChatId) : searchParams.get("chatId");
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
-  const [chatId, setChatId] = useState<number | null>(initialChatId ?? null);
+  const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [retryPendingOnOpen, setRetryPendingOnOpen] = useState(initialStatus === "toserve");
   const [draft, setDraft] = useState("");
   const [apps, setApps] = useState<ChatApp[]>(initialApps ?? []);
@@ -106,7 +106,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
     setRetryPendingOnOpen(false);
     if (!requestedChatId) return;
     let cancelled = false;
-    chatClientService.get(Number(requestedChatId)).then(async (response) => {
+    chatClientService.get(requestedChatId).then(async (response) => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not load saved chat.");
       if (!cancelled) {
@@ -211,7 +211,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line) continue;
-          const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean; chatId?: number };
+          const event = JSON.parse(line) as { type: string; progress?: RequestProgress; result?: Record<string, unknown>; error?: string; setupRequired?: boolean; chatId?: string };
           if (event.type === "progress" && event.progress) setRequestProgress(event.progress);
           else if (event.type === "saved" && event.chatId) {
             setChatId(event.chatId);
@@ -222,7 +222,7 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
         }
       }
       if (!result) throw new Error("Nia couldn’t complete that request.");
-      setChatId(result.chatId as number);
+      setChatId(result.chatId as string);
       if (typeof result.reply === "string" && result.reply.trim()) {
         setMessages((current) => [...current, { role: "assistant", text: result.reply as string, toolFormats: Array.isArray(result.toolFormats) ? result.toolFormats as ToolFormatHint[] : [] }]);
       } else {
@@ -296,13 +296,13 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
 }
 
 /** Selects voice mode or the regular chat view from the current chat URL. */
-function ChatPageContent({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
+function ChatPageContent({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: string; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
   return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} initialStatus={initialStatus} initialApps={initialApps} />;
 }
 
 /** Wraps search parameter consumers so static prerendering can suspend safely. */
-export default function ChatPage(props: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
+export default function ChatPage(props: { initialChatId?: string; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   return <Suspense fallback={<section className="chat-page" aria-busy="true" />}><ChatPageContent {...props} /></Suspense>;
 }

@@ -21,7 +21,7 @@ enum MessageType {
 }
 
 model IntelligenceKey {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   provider  String
   model     String?
   key       String
@@ -48,7 +48,7 @@ model Account {
 }
 
 model Chat {
-  id          Int          @id @default(autoincrement())
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   account_id  String?
   account     Account?     @relation(fields: [account_id], references: [id], onDelete: SetNull)
@@ -60,8 +60,8 @@ model Chat {
 }
 
 model Message {
-  id       Int         @id @default(autoincrement())
-  chat_id  Int
+  id       String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chat_id  String      @db.Uuid
   chat     Chat        @relation(fields: [chat_id], references: [id], onDelete: Cascade)
   type     MessageType
   content  String      @db.Text
@@ -91,7 +91,7 @@ model Application {
 }
 
 model Integration {
-  id             Int         @id @default(autoincrement())
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   application_id String      @db.Uuid
   application    Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
   account_id     String
@@ -106,7 +106,7 @@ model Integration {
 }
 
 model CallerLog {
-  id             Int          @id @default(autoincrement())
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   account_id     String?
   account        Account?     @relation(fields: [account_id], references: [id], onDelete: SetNull)
   application_id String?      @db.Uuid

@@ -8,7 +8,7 @@ import { Input } from "@neup/components/ui/input";
 import { Icon } from "../../ui-icon";
 
 type SavedKey = {
-  id: number;
+  id: string;
   provider: string;
   model: string | null;
   keyPreview: string;
@@ -70,7 +70,7 @@ export default function ManageKeysPage() {
   }
 
   /** Removes a saved key from the list. */
-  async function deleteKey(id: number) {
+  async function deleteKey(id: string) {
     setMessage("");
     try {
       const response = await keyClientService.remove(id);

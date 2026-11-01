@@ -3,7 +3,7 @@ import { prisma } from "@neup/core/database/prisma";
 export const dynamic = "force-dynamic";
 
 type CallerLogEntry = {
-  id: number;
+  id: string;
   account_id: string | null;
   application_id: string | null;
   log: unknown;

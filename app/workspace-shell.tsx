@@ -18,7 +18,7 @@ const navigation = [
   { href: "/settings", label: "Settings", icon: "settings" as const },
 ];
 
-type SavedChat = { id: number; title: string; lastUpdated: string };
+type SavedChat = { id: string; title: string; lastUpdated: string };
 
 export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

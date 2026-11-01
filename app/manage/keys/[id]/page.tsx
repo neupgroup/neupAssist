@@ -8,7 +8,7 @@ import { keyClientService } from "../../../../services/client";
 import { Icon } from "../../../ui-icon";
 
 type SavedKey = {
-  id: number;
+  id: string;
   provider: string;
   model: string | null;
   keyPreview: string;
@@ -25,7 +25,7 @@ export default function ManageKeyPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [removing, setRemoving] = useState(false);
-  const id = Number(rawId);
+  const id = rawId;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +35,7 @@ export default function ManageKeyPage() {
       setLoading(true);
       setMessage("");
       try {
-        if (!Number.isSafeInteger(id) || id < 1) throw new Error("This key ID is invalid.");
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new Error("This key ID is invalid.");
         const response = await keyClientService.list();
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to load this key.");

@@ -4,6 +4,11 @@ import { prisma } from "@neup/core/database/prisma";
 
 export const runtime = "nodejs";
 
+/** Validates UUID identifiers for saved provider keys. */
+function isKeyUuid(value: string | null): value is string {
+  return value !== null && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function GET() {
   try {
     const keys = await prisma.intelligenceKey.findMany({
@@ -60,9 +65,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const id = Number(new URL(request.url).searchParams.get("id"));
-  if (!Number.isSafeInteger(id) || id < 1) {
-    return NextResponse.json({ error: "A valid key ID is required." }, { status: 400 });
+  const id = new URL(request.url).searchParams.get("id");
+  if (!isKeyUuid(id)) {
+    return NextResponse.json({ error: "A valid key UUID is required." }, { status: 400 });
   }
 
   try {
