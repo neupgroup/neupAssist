@@ -1,7 +1,7 @@
 "use client";
 import { chatClientService, keyClientService } from "../../services/client";
 
-import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { FormEvent, Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
 import { Textarea } from "@neup/components/ui/textarea";
@@ -295,8 +295,13 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
 }
 
 /** Selects voice mode or the regular chat view from the current chat URL. */
-export default function ChatPage({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
+function ChatPageContent({ initialChatId, initialMessages, initialStatus, initialApps }: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
   const searchParams = useSearchParams();
   if (searchParams.get("mode") === "voice") return <VoiceAssistant initialChatId={initialChatId} />;
   return <ChatConversationPage initialChatId={initialChatId} initialMessages={initialMessages} initialStatus={initialStatus} initialApps={initialApps} />;
+}
+
+/** Wraps search parameter consumers so static prerendering can suspend safely. */
+export default function ChatPage(props: { initialChatId?: number; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
+  return <Suspense fallback={<section className="chat-page" aria-busy="true" />}><ChatPageContent {...props} /></Suspense>;
 }
