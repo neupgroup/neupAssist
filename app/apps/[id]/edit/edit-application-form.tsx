@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { withAppBasePath } from "@/services/app-url";
 import { Button } from "@neup/components/ui/button";
 import { Input } from "@neup/components/ui/input";
 import { Textarea } from "@neup/components/ui/textarea";
@@ -41,7 +42,7 @@ export default function EditApplicationForm({ application }: { application: Edit
       <label className="setting-field"><span>More details <small>Optional</small></span><Textarea name="moreDetails" defaultValue={application.moreDetails ?? ""} placeholder="Additional setup or usage details" /></label>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0ec] pt-4">
         <span className="text-xs text-[#89928b]">Endpoint data is stored as JSONB.</span>
-        <div className="flex gap-2"><Button type="button" variant="outlined" onClick={() => window.location.assign(`/apps/${application.id}`)}>Cancel</Button><Button type="submit" variant="solid" disabled={pending}>{pending ? "Saving…" : <><Icon name="check" size={15} /> Save changes</>}</Button></div>
+        <div className="flex gap-2"><Button type="button" variant="outlined" onClick={() => window.location.assign(withAppBasePath(`/apps/${application.id}`))}>Cancel</Button><Button type="submit" variant="solid" disabled={pending}>{pending ? "Saving…" : <><Icon name="check" size={15} /> Save changes</>}</Button></div>
       </div>
     </form>
   );

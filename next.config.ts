@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: "/assist"
+  basePath: process.env.NEXT_PUBLIC_APP_BASEPATH ?? "",
 };
 
 export default nextConfig;

@@ -1,5 +1,6 @@
 "use client";
 import { chatClientService } from "../services/client";
+import { withAppBasePath } from "../services/app-url";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -51,7 +52,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       setChats((current) => current.filter((entry) => entry.id !== chat.id));
       window.dispatchEvent(new Event("chats-updated"));
       setChatToDelete(null);
-      if (pathname === `/chat/${chat.id}`) window.location.assign("/chat");
+      if (pathname === `/chat/${chat.id}`) window.location.assign(withAppBasePath("/chat"));
     } catch (error) {
       setChatActionError(error instanceof Error ? error.message : "Could not delete this chat.");
     } finally {
@@ -66,7 +67,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           <Link href="/chat" className="inline-flex items-center gap-[9px]"><span className="grid h-7 w-7 place-items-center rounded-[9px] bg-[#456f5b] text-white"><Icon name="sparkles" size={16} /></span><span className="text-[21px] font-semibold leading-none tracking-[-.055em]">nia<span className="text-[#6e9a7e">.</span></span></Link>
           <Button variant="plain" size="icon" aria-label="Collapse sidebar" className="icon-button !h-[31px] !w-[31px]"><Icon name="panel" size={17} /></Button>
         </div>
-        <Button variant="outlined" className="mt-[27px] !h-10 !w-full !justify-start !gap-[9px] !rounded-[9px] !border-border !bg-white !text-[14px] !font-medium !text-[#353f39] shadow-[0_1px_2px_#18302306] hover:!bg-[#f8faf8] max-[600px]:hidden" onClick={() => window.location.assign("/chat")}><Icon name="plus" size={16} /><span>New chat</span><kbd className="ml-auto rounded-[5px] border border-[#e8ebe7] px-[5px] py-[2px] font-[inherit] text-[10px] text-[#8c948d]">⌘ K</kbd></Button>
+        <Button variant="outlined" className="mt-[27px] !h-10 !w-full !justify-start !gap-[9px] !rounded-[9px] !border-border !bg-white !text-[14px] !font-medium !text-[#353f39] shadow-[0_1px_2px_#18302306] hover:!bg-[#f8faf8] max-[600px]:hidden" onClick={() => window.location.assign(withAppBasePath("/chat"))}><Icon name="plus" size={16} /><span>New chat</span><kbd className="ml-auto rounded-[5px] border border-[#e8ebe7] px-[5px] py-[2px] font-[inherit] text-[10px] text-[#8c948d]">⌘ K</kbd></Button>
 
         <div className="mt-[29px] mb-[10px] mx-[9px] text-[10px] font-semibold uppercase tracking-[.11em] text-[#919992] max-[600px]:hidden">Workspace</div>
         <nav className="grid gap-[3px] max-[600px]:flex max-[600px]:w-full max-[600px]:max-w-[390px] max-[600px]:justify-around max-[600px]:gap-1" aria-label="Workspace">
