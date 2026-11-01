@@ -9,10 +9,33 @@ import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpTool
 import { ensureAccount } from "@neup/shared/account/self";
 import { logApplicationError } from "@/app/server-logger";
 
-/** Lists the most recently updated chats. */
-export async function listChats() {
-  await logServiceRun("chat.list");
-  return prisma.chat.findMany({ select: { id: true, title: true, lastUpdated: true }, orderBy: { lastUpdated: "desc" }, take: 50 });
+/** Lists one page of the most recently updated chats for an account. */
+export async function listChats(accountId: string | undefined, limit = 10, offset = 0) {
+  await logServiceRun("chat.list", { limit, offset });
+  const where = accountId ? { account_id: accountId } : { account_id: null };
+  const [chats, total] = await prisma.$transaction([
+    prisma.chat.findMany({ where, select: { id: true, title: true, lastUpdated: true }, orderBy: { lastUpdated: "desc" }, take: limit, skip: offset }),
+    prisma.chat.count({ where }),
+  ]);
+  return { chats, pagination: { limit, offset, total, hasMore: offset + chats.length < total } };
+}
+
+/** Creates an empty chat and returns its public identity. */
+export async function createChat(accountId: string | undefined, title = "New chat") {
+  await logServiceRun("chat.create");
+  return prisma.chat.create({ data: { title: title.trim().slice(0, 120) || "New chat", account_id: accountId ?? null }, select: { id: true, title: true } });
+}
+
+/** Loads a page of messages in chronological order for one account-owned chat. */
+export async function listChatMessages(chatId: string, accountId: string | undefined, limit = 20, offset = 0) {
+  await logServiceRun("chat.messages.list", { chatId, limit, offset });
+  const chat = await prisma.chat.findFirst({ where: { id: chatId, ...(accountId ? { account_id: accountId } : { account_id: null }) }, select: { id: true } });
+  if (!chat) return null;
+  const [messages, total] = await prisma.$transaction([
+    prisma.message.findMany({ where: { chat_id: chatId }, orderBy: [{ sent_on: "asc" }, { id: "asc" }], skip: offset, take: limit, select: { id: true, type: true, content: true, sent_on: true } }),
+    prisma.message.count({ where: { chat_id: chatId } }),
+  ]);
+  return { messages: messages.map(({ type, ...message }) => ({ ...message, role: type === "userSent" ? "user" as const : type === "intelligenceReply" ? "assistant" as const : "notification" as const })), pagination: { limit, offset, total, hasMore: offset + messages.length < total } };
 }
 
 /** Loads a chat and converts stored messages to the conversation format. */
