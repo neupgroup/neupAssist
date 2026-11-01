@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import type { Writable } from "node:stream";
 import type { ChatMessage } from "../chat";
 import prompts from "../request/prompts.json";
 import { logger } from "@neup/logica/logger";
@@ -116,25 +115,17 @@ export function readToolCalls(responseBody: string): ToolCall[] {
   });
 }
 
-/** Sends curl options on a separate pipe and streams the JSON request body through stdin. */
+/** Streams a JSON request body to curl while passing request options as arguments. */
 function invokeCurl({ url, headers, body }: { url: string; headers: Headers; body: string }): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const config = [
-      `url = ${JSON.stringify(url)}`,
-      'request = "POST"',
-      ...Array.from(headers, ([name, value]) => `header = ${JSON.stringify(`${name}: ${value}`)}`),
-      "max-time = 180",
-    ].join("\n");
-    const process = spawn("curl", [
-      "--config", "/dev/fd/3", "--silent", "--show-error", "--connect-timeout", "20",
-      "--no-buffer", "--data-binary", "@-", "--write-out", "\\n__NEUP_HTTP_STATUS__:%{http_code}",
-    ], { stdio: ["pipe", "pipe", "pipe", "pipe"] });
-    const configStream = process.stdio[3] as Writable | null;
-    if (!configStream) {
-      process.kill();
-      reject(new Error("curl configuration stream could not be opened."));
-      return;
-    }
+    const args = [
+      "--silent", "--show-error", "--connect-timeout", "20", "--max-time", "180",
+      "--no-buffer", "--request", "POST",
+      ...Array.from(headers, ([name, value]) => ["--header", `${name}: ${value}`]).flat(),
+      "--data-binary", "@-", "--write-out", "\\n__NEUP_HTTP_STATUS__:%{http_code}",
+      "--url", url,
+    ];
+    const process = spawn("curl", args, { stdio: ["pipe", "pipe", "pipe"] });
 
     let stdout = "";
     let stderr = "";
@@ -157,7 +148,6 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
       const status = Number(stdout.slice(markerIndex + statusMarker.length).trim());
       resolve({ status, body: stdout.slice(0, markerIndex).replace(/\\n$/, "") });
     });
-    configStream.end(config);
     process.stdin.end(body);
   });
 }
