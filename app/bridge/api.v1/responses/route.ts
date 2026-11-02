@@ -128,14 +128,19 @@ export async function POST(request: Request) {
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
           const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          let pendingOutput = "";
           try {
             const failure = await streamResponsesModel({
               ...credential,
               input,
-              onText: (text) => emit({ success: true, data: { id: responseId, output: [{ type: "text", value: text }] } }),
+              onText: (text) => {
+                emit({ success: true, data: { id: responseId, output: [{ type: "text", value: text }] } });
+              },
             });
             if (failure) emit({ success: false, error: { code: "provider_request_failed", description: failure.error } });
-            else emit({ success: true, data: { id: responseId, done: true } });
+            else {
+              emit({ success: true, data: { id: responseId, done: true } });
+            }
           } catch (error) {
             await logApplicationError(error, "POST /bridge/api.v1/responses streaming");
             emit({ success: false, error: { code: "provider_unavailable", description: "The configured AI provider could not complete the request." } });

@@ -1,5 +1,5 @@
 import "server-only";
-import { buildSystemPrompt } from "../request/prompts";
+import { buildRootSystemPrompt } from "../request/prompts";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "@/app/server-logger";
 import { buildGoogleRequest, readGoogleResponse } from "./google.default";
@@ -10,10 +10,10 @@ import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.def
 export type ResponsePromptItem = { type: "text"; role: string; text: string };
 type ProviderResponse = { output: string } | { error: string; status: number };
 
-/** Combines the built-in system and persona with caller system instructions. */
+/** Combines only the root system prompt with caller system instructions. */
 function getSystemInstruction(input: ResponsePromptItem[]) {
   const callerSystem = input.filter(({ role }) => role === "system").map(({ text }) => text);
-  return [`root: ${buildSystemPrompt({ includeTextContext: false })}`, ...callerSystem.map((text) => `system: ${text}`)].filter(Boolean).join("\n");
+  return [`root: ${buildRootSystemPrompt()}`, ...callerSystem.map((text) => `system: ${text}`)].filter(Boolean).join("\n");
 }
 
 /** Supplies a minimal prompt when callers request a response without user text. */

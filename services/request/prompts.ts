@@ -5,6 +5,11 @@ export function buildSystemPrompt({ includeTextContext }: { includeTextContext: 
   return [prompts.system, prompts.persona, includeTextContext ? prompts.textcontext : null].filter(Boolean).join("\n\n");
 }
 
+/** Returns only the base system prompt, without persona or chat-specific guidance. */
+export function buildRootSystemPrompt() {
+  return prompts.system;
+}
+
 /** Resolves persona template sections while keeping text-context guidance opt-in. */
 export function resolvePromptSection(path = "") {
   const sections = prompts as Record<string, unknown>;

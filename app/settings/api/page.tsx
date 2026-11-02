@@ -40,7 +40,7 @@ Content-Type: application/json
     ]
   }
 }`}</code></pre>
-          <p className="mb-0 mt-3 text-[13px] leading-5 text-[#858f86]">Set <code>stream</code> to <code>true</code> to receive newline-delimited JSON events. Each output event adds entities to <code>data.output</code>; the final event has <code>data.done: true</code>.</p>
+          <p className="mb-0 mt-3 text-[13px] leading-5 text-[#858f86]">Set <code>stream</code> to <code>true</code> to receive newline-delimited JSON events. Each output event adds text entities to <code>data.output</code>; the final event has <code>data.done: true</code>.</p>
           <pre className="mt-3 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`{"success":true,"data":{"id":"resp_...","output":[{"type":"text","value":"Hello"}]}}
 {"success":true,"data":{"id":"resp_...","output":[{"type":"text","value":" there!"}]}}
 {"success":true,"data":{"id":"resp_...","done":true}}`}</code></pre>
