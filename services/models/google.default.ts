@@ -1,9 +1,9 @@
-import type { ChatMessage } from "../chat";
-import prompts from "../request/prompts.json";
-import { compileChat, compileChatPrompt } from "../request/chat";
-import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "../../app/curl-template";
+import type { ChatMessage } from "@/services/chat";
+import { buildSystemPrompt } from "@/services/request/prompts";
+import { compileChat, compileChatPrompt } from "@/services/request/chat";
+import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } from "@/app/curl-template";
 import { logger } from "@neup/logica/logger";
-import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
+import { logAIRequest, redactLogSecrets } from "@/app/server-logger";
 import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export type GoogleModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
@@ -46,7 +46,7 @@ export type GoogleRequestConfig = {
   tools?: ToolDefinition[];
 };
 
-export function buildGoogleRequest({ model, messages, systemInstruction = prompts.persona, tools = contextTools }: GoogleRequestConfig) {
+export function buildGoogleRequest({ model, messages, systemInstruction = buildSystemPrompt({ includeTextContext: false }), tools = contextTools }: GoogleRequestConfig) {
   if (!supportsGoogleRequestModel(model)) throw new Error("Google Interactions requests require a Gemini model ID (gemini-…).");
   return {
     url: "https://generativelanguage.googleapis.com/v1beta/interactions",
@@ -70,7 +70,8 @@ export async function requestGoogle({ model, apiKey, messages, requestFormat, to
 }): Promise<GoogleModelResponse> {
   const customFormat = requestFormat?.trim();
   const chatHistory = compileChat(messages);
-  const prompt = compileChatPrompt(messages, customFormat ? `${prompts.persona}\n\n${prompts.textcontext}` : prompts.persona);
+  const defaultSystemInstruction = buildSystemPrompt({ includeTextContext: customFormat ? true : false });
+  const prompt = compileChatPrompt(messages, defaultSystemInstruction);
   let url: string;
   let method = "POST";
   let headers = new Headers({ "Content-Type": "application/json" });

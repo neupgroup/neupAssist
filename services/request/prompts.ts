@@ -1,15 +1,15 @@
-import prompts from "./prompts.json";
+import prompts from "@/services/request/prompts.json";
 
 /** Combines the assistant persona with text-command guidance when required. */
 export function buildSystemPrompt({ includeTextContext }: { includeTextContext: boolean }) {
-  return includeTextContext ? `${prompts.persona}\n\n${prompts.textcontext}` : prompts.persona;
+  return [prompts.system, prompts.persona, includeTextContext ? prompts.textcontext : null].filter(Boolean).join("\n\n");
 }
 
 /** Resolves persona template sections while keeping text-context guidance opt-in. */
 export function resolvePromptSection(path = "") {
   const sections = prompts as Record<string, unknown>;
   const names = path ? path.split(".") : [];
-  const base = typeof sections.persona === "string" ? sections.persona : "";
+  const base = [sections.system, sections.persona].filter((value): value is string => typeof value === "string" && Boolean(value.trim())).join("\n\n");
   const extra = names
     .filter((name) => name !== "persona")
     .map((name) => sections[name]);

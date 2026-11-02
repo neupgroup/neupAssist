@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import type { ChatMessage } from "../chat";
-import prompts from "../request/prompts.json";
+import type { ChatMessage } from "@/services/chat";
+import { buildSystemPrompt } from "@/services/request/prompts";
 import { logger } from "@neup/logica/logger";
-import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
+import { logAIRequest, redactLogSecrets } from "@/app/server-logger";
 import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export const modelId = "nvidia/nemotron-3.5-bolt-e4b";
@@ -46,7 +46,7 @@ export function buildRequest(messages: ChatMessage[], tools: ToolDefinition[] = 
     },
     body: {
       model: modelId,
-      messages: [{ role: "system", content: prompts.persona }, ...messages],
+      messages: [{ role: "system", content: buildSystemPrompt({ includeTextContext: false }) }, ...messages],
       temperature: 1,
       top_p: 0.95,
       max_tokens: 1024,

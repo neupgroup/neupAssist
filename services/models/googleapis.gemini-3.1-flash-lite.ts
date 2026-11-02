@@ -1,5 +1,5 @@
 import type { ChatTurn } from "../request/chat";
-import prompts from "../request/prompts.json";
+import { buildSystemPrompt } from "../request/prompts";
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 
@@ -24,7 +24,7 @@ export function supportsModel(model: string) {
   return model.toLowerCase() === modelId;
 }
 
-export function buildRequest(messages: ChatTurn[], systemInstruction = prompts.persona) {
+export function buildRequest(messages: ChatTurn[], systemInstruction = buildSystemPrompt({ includeTextContext: false })) {
   return {
     url: requestFormat.endpoint,
     headers: { "Content-Type": "application/json" },

@@ -1,5 +1,5 @@
-import type { ChatTurn as ModelMessage } from "../request/chat";
-import prompts from "../request/prompts.json";
+import type { ChatTurn as ModelMessage } from "@/services/request/chat";
+import { buildSystemPrompt } from "@/services/request/prompts";
 
 export const modelId = "gemini-3.1-flash-lite";
 
@@ -26,7 +26,7 @@ export function supportsModel(model: string) {
   return model.toLowerCase() === modelId;
 }
 
-export function buildRequest(messages: ModelMessage[], systemInstruction = prompts.persona) {
+export function buildRequest(messages: ModelMessage[], systemInstruction = buildSystemPrompt({ includeTextContext: false })) {
   return {
     url: requestFormat.endpoint,
     headers: { "Content-Type": "application/json" },
