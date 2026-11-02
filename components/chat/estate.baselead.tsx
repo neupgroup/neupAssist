@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { Icon } from "@/app/ui-icon";
 
 export type EstateLead = {
   id: string | number;
@@ -46,7 +47,7 @@ export function EstateBaseLead({ lead }: { lead: EstateLead }) {
     </button>
     {isOpen && <div className="fixed inset-0 z-[30] grid place-items-center bg-[rgb(24_34_27_/_38%)] p-5" onClick={() => setIsOpen(false)}>
       <section className="relative w-full max-w-[420px] rounded-2xl border border-[#e5ebe3] bg-white p-[23px] shadow-[0_20px_70px_rgb(23_36_27_/_22%)]" role="dialog" aria-modal="true" aria-labelledby={`estate-lead-title-${lead.id}`} onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="absolute right-3 top-[10px] grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-transparent text-2xl text-[#778178] hover:bg-[#f2f5f1]" onClick={() => setIsOpen(false)} aria-label="Close contact options">×</button>
+        <button type="button" className="absolute right-3 top-[10px] grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-transparent text-[#778178] hover:bg-[#f2f5f1]" onClick={() => setIsOpen(false)} aria-label="Close contact options"><Icon name="close" size={18} /></button>
         <div className="flex items-center gap-3 pr-6">
           {lead.image ? <Image className="h-12 w-12 shrink-0 rounded-[10px] object-cover" src={lead.image} alt="" width={48} height={48} unoptimized /> : <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[10px] bg-[#edf3ec] text-[18px] font-semibold text-[#5d7c63]" aria-hidden="true">{lead.name.trim().slice(0, 1).toUpperCase() || "L"}</span>}
           <div><h2 className="m-0 text-[15px] font-semibold text-[#3c4940]" id={`estate-lead-title-${lead.id}`}>{lead.name}</h2><p className="mt-1 text-[14px] text-[#879188]">Contact this lead</p></div>

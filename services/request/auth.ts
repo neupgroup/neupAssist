@@ -1,5 +1,5 @@
 import "server-only";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 export { auth } from "@neup/logica/account/auth";
 
@@ -14,7 +14,23 @@ export async function getPublicAccountToken(getCookie: CookieReader, request?: R
   return requestHeaders.get("x-auth")?.trim() || undefined;
 }
 
-/** Reads the account credential from the bridge request header without consulting cookies. */
-export function getBridgeEndpointAccountToken(request: Request) {
-  return request.headers.get("x-auth")?.trim() || undefined;
+/** Reads the account credential from x-auth, falling back to the auth cookie. */
+export async function getBridgeEndpointAccountToken(request: Request) {
+  const headerToken = request.headers.get("x-auth")?.trim();
+  if (headerToken) return headerToken;
+
+  const cookieToken = request.headers.get("cookie")
+    ?.split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith("auth="))
+    ?.slice("auth=".length);
+  if (cookieToken?.trim()) {
+    try {
+      return decodeURIComponent(cookieToken).trim();
+    } catch {
+      return cookieToken.trim();
+    }
+  }
+
+  return (await cookies()).get("auth")?.value?.trim() || undefined;
 }

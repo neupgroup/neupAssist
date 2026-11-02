@@ -9,7 +9,7 @@ export async function serviceRequest(path: string, options: RequestInit = {}): P
 
 export const chatClientService = {
   list: () => serviceRequest("/bridge/api.v1/chats"),
-  listApps: () => serviceRequest("/bridge/api.v1/chat/apps"),
+  listApps: () => serviceRequest("/bridge/api.v1/applications"),
   get: (chatId: string) => serviceRequest("/bridge/api.v1/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId }) }),
   remove: (chatId: string) => serviceRequest(`/bridge/api.v1/chats?id=${encodeURIComponent(chatId)}`, { method: "DELETE" }),
   removeAll: () => serviceRequest("/bridge/api.v1/chats?all=true", { method: "DELETE" }),

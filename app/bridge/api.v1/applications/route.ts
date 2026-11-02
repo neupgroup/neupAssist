@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
     return NextResponse.json(await listConnectedChatApps(account?.id));
   } catch (error) {
-    await logApplicationError(error, "GET /api/chat/apps");
+    await logApplicationError(error, "GET /api/applications");
     return NextResponse.json({ error: "Could not load connected apps." }, { status: 503 });
   }
 }

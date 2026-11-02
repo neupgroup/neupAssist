@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Outfit } from "next/font/google";
 import { WorkspaceLayout } from "./workspace-layout";
 import "./globals.css";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-outfit",
+});
 
 export const metadata: Metadata = {
   title: "Nia",
@@ -12,7 +20,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body><WorkspaceLayout>{children}</WorkspaceLayout></body>
+      <body className={`${outfit.variable} m-0 min-h-screen bg-background font-sans text-foreground`}><WorkspaceLayout>{children}</WorkspaceLayout></body>
     </html>
   );
 }

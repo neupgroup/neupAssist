@@ -10,11 +10,11 @@ import { getPublicAccountToken } from "@/services/request/auth";
 /** Connects the signed-in account to an application using its existing catalog record. */
 export async function connectApplication(formData: FormData) {
   const id = String(formData.get("applicationId") ?? "").trim();
-  const destination = `/apps/${id}`;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) redirect("/apps");
+  const destination = `/applications/${id}`;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) redirect("/applications");
 
   const application = await prisma.application.findUnique({ where: { id }, select: { id: true } });
-  if (!application) redirect("/apps");
+  if (!application) redirect("/applications");
   const account = await ensureAccount(await getPublicAccountToken(getCookie));
   if (!account) redirect(`${destination}?connect=signin`);
 
@@ -28,7 +28,7 @@ export async function connectApplication(formData: FormData) {
     await prisma.integration.create({ data: { application_id: id, account_id: account.id, auth_info: "", status: "active" } });
   }
 
-  revalidatePath("/apps");
+  revalidatePath("/applications");
   revalidatePath(destination);
   redirect(`${destination}?connected=1`);
 }

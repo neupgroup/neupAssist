@@ -1,11 +1,11 @@
 "use client";
-import { chatClientService, keyClientService } from "../../services/client";
+import { chatClientService } from "../../services/client";
 import { withAppBasePath } from "../../services/app-url";
 
 import { FormEvent, Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
-import { Textarea } from "@neup/components/ui/textarea";
+import { TextareaInput } from "@neup/components/ui/textarea.input";
 import { Icon } from "../ui-icon";
 import { renderChatContent } from "@/components/chat/render";
 import VoiceAssistant from "@/components/voice/voice-assistant";
@@ -55,7 +55,7 @@ function renderUserMessage(text: string, apps: ChatApp[]): ReactNode[] {
     const start = match.index ?? 0;
     if (start > cursor) nodes.push(text.slice(cursor, start));
     const app = apps.find(({ id }) => id === match[1]);
-    nodes.push(<span key={`app-mention-${index++}`} className="chat-app-mention">@{app?.name ?? match[1]}</span>);
+    nodes.push(<span key={`app-mention-${index++}`} className="font-semibold text-primary">@{app?.name ?? match[1]}</span>);
     cursor = start + match[0].length;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
@@ -76,7 +76,6 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
   const [sending, setSending] = useState(false);
   const [requestProgress, setRequestProgress] = useState<RequestProgress | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
-  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -169,17 +168,6 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
     void retryPendingResponse();
   }, [retryPendingOnOpen, chatId, sending]);
 
-  useEffect(() => {
-    keyClientService.list()
-      .then(async (response) => {
-        if (!response.ok) return false;
-        const saved = await response.json();
-        return Array.isArray(saved) && saved.length > 0;
-      })
-      .then(setProviderConfigured)
-      .catch(() => setProviderConfigured(false));
-  }, []);
-
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
@@ -269,31 +257,34 @@ function ChatConversationPage({ initialChatId, initialMessages, initialStatus, i
     ? apps.filter((app) => app.name.toLocaleLowerCase().includes(activeAppQuery.query.toLocaleLowerCase()))
     : [];
 
-  return <section className="chat-page">
-    <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Chat</strong></div><div className="topbar-actions">{chatId && <Button variant="outlined" onClick={() => window.location.assign(withAppBasePath(`/chat/${chatId}?mode=voice`))}><Icon name="voice" size={16} /> Voice</Button>}<span className="model-status">{providerConfigured === null ? "Checking AI model…" : providerConfigured ? "AI model connected" : "No AI model connected"}</span>{providerConfigured === false && <Button variant="plain" size="sm" onClick={() => window.location.assign(withAppBasePath("/manage/keys"))}>Connect</Button>}<Button variant="plain" size="icon" aria-label="More chat options" className="icon-button"><Icon name="more" size={19} /></Button></div></header>
-    <div className="conversation-scroll">
-      {messages.length === 0 ? <div className="chat-empty">
-        <div className="greeting-icon"><Icon name="sparkles" size={21} /></div><p className="greeting-overline">YOUR PERSONAL ASSISTANT</p><h1>What can I help you<br className="desktop-break" /> with today?</h1><p className="greeting-copy">Ask anything, think something through, or get a little help with your day.</p>
-        <div className="suggestion-grid">
-          <button className="suggestion-card" onClick={() => setDraft("Help me plan a focused week")}><span className="suggestion-symbol sage">◷</span><span><strong>Plan my week</strong><small>Make room for what matters</small></span><span className="suggestion-arrow">↗</span></button>
-          <button className="suggestion-card" onClick={() => setDraft("Help me think through a decision")}><span className="suggestion-symbol lilac">✳</span><span><strong>Think it through</strong><small>Talk through a decision</small></span><span className="suggestion-arrow">↗</span></button>
-          <button className="suggestion-card" onClick={() => setDraft("Explain a tricky topic simply")}><span className="suggestion-symbol amber">⌘</span><span><strong>Learn something</strong><small>Make a tricky topic simple</small></span><span className="suggestion-arrow">↗</span></button>
-          <button className="suggestion-card" onClick={() => setDraft("Help me write a thoughtful message")}><span className="suggestion-symbol blue">✎</span><span><strong>Write together</strong><small>Find the right words</small></span><span className="suggestion-arrow">↗</span></button>
+  return <section className="relative -mx-6 -mt-6 flex min-h-[calc(100dvh-4rem)] flex-col bg-white md:-mx-10 md:-mt-10">
+    <div className="flex flex-1 flex-col">
+      {messages.length === 0 ? <div className="mx-auto my-auto w-[min(calc(100%-40px),620px)] py-[30px] pb-12 text-center max-[600px]:w-[min(calc(100%-32px),500px)] max-[600px]:py-6 max-[600px]:pb-8">
+        <h1 className="m-0 text-[clamp(35px,4vw,47px)] font-medium leading-[1.13] tracking-[-.055em] text-foreground">What can I help you<br className="hidden sm:block" /> with today?</h1><p className="mx-auto mt-[15px] max-w-[460px] text-base leading-[1.7] text-muted-foreground max-[600px]:max-w-[330px] max-[600px]:text-[15px]">Ask anything, think something through, or get a little help with your day.</p>
+        <div className="mt-[35px] grid grid-cols-2 gap-[10px] text-left max-[600px]:mt-[25px] max-[600px]:gap-[7px]">
+          <button className="group flex min-h-[68px] cursor-pointer items-center gap-[11px] rounded-xl border border-border bg-card px-[13px] py-[11px] text-left transition hover:-translate-y-px hover:border-primary-300 hover:shadow-md max-[600px]:min-h-16 max-[600px]:gap-2 max-[600px]:p-[9px]" onClick={() => setDraft("Help me plan a focused week")}><span className="grid h-[33px] w-[33px] shrink-0 place-items-center rounded-[10px] bg-success/10 text-success"><Icon name="calendar" size={17} /></span><span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-card-foreground max-[600px]:text-[13px]">Plan my week</strong><small className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground max-[600px]:text-xs">Make room for what matters</small></span><span className="ml-auto text-sm text-muted-foreground max-[600px]:hidden"><Icon name="arrow" size={16} /></span></button>
+          <button className="group flex min-h-[68px] cursor-pointer items-center gap-[11px] rounded-xl border border-border bg-card px-[13px] py-[11px] text-left transition hover:-translate-y-px hover:border-primary-300 hover:shadow-md max-[600px]:min-h-16 max-[600px]:gap-2 max-[600px]:p-[9px]" onClick={() => setDraft("Help me think through a decision")}><span className="grid h-[33px] w-[33px] shrink-0 place-items-center rounded-[10px] bg-accent text-accent-foreground"><Icon name="brain" size={17} /></span><span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-card-foreground max-[600px]:text-[13px]">Think it through</strong><small className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground max-[600px]:text-xs">Talk through a decision</small></span><span className="ml-auto text-sm text-muted-foreground max-[600px]:hidden"><Icon name="arrow" size={16} /></span></button>
+          <button className="group flex min-h-[68px] cursor-pointer items-center gap-[11px] rounded-xl border border-border bg-card px-[13px] py-[11px] text-left transition hover:-translate-y-px hover:border-primary-300 hover:shadow-md max-[600px]:min-h-16 max-[600px]:gap-2 max-[600px]:p-[9px]" onClick={() => setDraft("Explain a tricky topic simply")}><span className="grid h-[33px] w-[33px] shrink-0 place-items-center rounded-[10px] bg-warning/10 text-warning"><Icon name="bookOpen" size={17} /></span><span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-card-foreground max-[600px]:text-[13px]">Learn something</strong><small className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground max-[600px]:text-xs">Make a tricky topic simple</small></span><span className="ml-auto text-sm text-muted-foreground max-[600px]:hidden"><Icon name="arrow" size={16} /></span></button>
+          <button className="group flex min-h-[68px] cursor-pointer items-center gap-[11px] rounded-xl border border-border bg-card px-[13px] py-[11px] text-left transition hover:-translate-y-px hover:border-primary-300 hover:shadow-md max-[600px]:min-h-16 max-[600px]:gap-2 max-[600px]:p-[9px]" onClick={() => setDraft("Help me write a thoughtful message")}><span className="grid h-[33px] w-[33px] shrink-0 place-items-center rounded-[10px] bg-informatic/10 text-informatic"><Icon name="pencil" size={17} /></span><span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-card-foreground max-[600px]:text-[13px]">Write together</strong><small className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground max-[600px]:text-xs">Find the right words</small></span><span className="ml-auto text-sm text-muted-foreground max-[600px]:hidden"><Icon name="arrow" size={16} /></span></button>
         </div>
-      </div> : <div className="message-list">{messages.map((message, index) => <article className={`message message-${message.role}`} key={`${index}-${message.role}`}>
-        {message.role === "assistant" ? <span className="message-avatar"><Icon name="sparkles" size={20} /></span> : <span className="user-message-label">You</span>}
-        <div className="message-body">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{renderUserMessage(message.text, apps)}</p>}{message.role === "assistant" && <div className="message-tools"><Button variant="plain" size="icon" className="icon-button" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="icon-button" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="icon-button" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
-      </article>)}{sending && <article className="message message-assistant"><span className="message-avatar"><Icon name="sparkles" size={20} /></span><div className="message-body" aria-live="polite" aria-atomic="true">
-        {!requestProgress && <p className="request-status">Nia is thinking…</p>}
-        {requestProgress?.type === "personalizing" && <p className="request-status">Please wait while I personalize results for you.</p>}
-        {(requestProgress?.type === "connecting" || requestProgress?.type === "communicating") && <div className="app-request-status request-status"><span className="app-request-logo">{requestProgress.logo ? <img src={requestProgress.logo} alt="" /> : <Icon name="code" size={16} />}</span><span>{requestProgress.type === "connecting" ? "Connecting to" : "Communicating to"} <strong>{requestProgress.app}</strong></span></div>}
-      </div></article>}{error && <div className="chat-error" role="alert"><p>{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign(withAppBasePath("/manage/keys"))}>Manage provider keys</Button>}</div>}</div>}
+      </div> : <div className="mx-auto my-[30px] mb-[45px] w-[min(calc(100%-52px),720px)] pb-[150px] max-[600px]:my-[22px] max-[600px]:w-[calc(100%-30px)]">{messages.map((message, index) => <article className={`my-[26px] flex gap-[13px] ${message.role === "user" ? "justify-end" : ""}`} key={`${index}-${message.role}`}>
+        {message.role === "assistant" ? <span className="grid h-[27px] w-[27px] shrink-0 place-items-center rounded-[9px] border border-border bg-card text-primary-600"><Icon name="sparkles" size={20} /></span> : <span className="self-start pt-2 text-[13px] text-muted-foreground">You</span>}
+        <div className={`min-w-0 ${message.role === "user" ? "max-w-[80%] rounded-[14px_14px_4px_14px] bg-muted px-[15px] py-3 text-foreground" : "max-w-[calc(100%-40px)] pt-[3px]"}`}><div className="[&>*+*]:mt-[10px] [&_p]:m-0 [&_p]:whitespace-pre-wrap [&_p]:text-[15px] [&_p]:leading-[1.75]">{message.role === "assistant" ? renderChatContent(message.text, message.toolFormats) : <p>{renderUserMessage(message.text, apps)}</p>}</div>{message.role === "assistant" && <div className="mt-[9px] flex gap-px"><Button variant="plain" size="icon" className="!h-[27px] !w-[27px]" aria-label="Copy response" onClick={async () => { await navigator.clipboard.writeText(message.text); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? <Icon name="check" size={20} /> : <Icon name="copy" size={20} />}</Button><Button variant="plain" size="icon" className="!h-[27px] !w-[27px]" aria-label="Good response"><Icon name="like" size={20} /></Button><Button variant="plain" size="icon" className="!h-[27px] !w-[27px]" aria-label="Bad response"><Icon name="dislike" size={20} /></Button></div>}</div>
+      </article>)}{sending && <article className="my-[26px] flex gap-[13px]"><span className="grid h-[27px] w-[27px] shrink-0 place-items-center rounded-[9px] border border-border bg-card text-primary-600"><Icon name="sparkles" size={20} /></span><div className="min-w-0 pt-[3px]" aria-live="polite" aria-atomic="true">
+        {!requestProgress && <p className="animate-pulse text-sm text-muted-foreground">Nia is thinking…</p>}
+        {requestProgress?.type === "personalizing" && <p className="animate-pulse text-sm text-muted-foreground">Please wait while I personalize results for you.</p>}
+        {(requestProgress?.type === "connecting" || requestProgress?.type === "communicating") && <div className="flex items-center gap-[9px] text-sm text-muted-foreground"><span className="grid h-[27px] w-[27px] shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-card text-primary-600">{requestProgress.logo ? <img className="h-full w-full object-cover" src={requestProgress.logo} alt="" /> : <Icon name="code" size={16} />}</span><span>{requestProgress.type === "connecting" ? "Connecting to" : "Communicating to"} <strong className="font-semibold text-foreground">{requestProgress.app}</strong></span></div>}
+      </div></article>}{error && <div className="ml-10 mt-3 flex flex-wrap items-center gap-[10px] rounded-[10px] border border-danger/20 bg-danger/5 px-[14px] py-3 text-sm text-danger"><p className="m-0 leading-6">{error}</p>{setupRequired && <Button variant="outlined" onClick={() => window.location.assign(withAppBasePath("/settings/keys"))}>Manage provider keys</Button>}</div>}</div>}
     </div>
-    <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}>
-      {activeAppQuery && <div className="mention-suggestions" role="listbox" aria-label="Connected apps">{matchingApps.length ? matchingApps.map((app) => <button key={app.id} type="button" role="option" aria-selected="false" className="mention-suggestion" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMentionedApp(app)}>{app.logo ? <img src={app.logo} alt="" /> : <Icon name="code" size={16} />}<span>@{app.name}</span></button>) : <div className="mention-empty">No matching connected apps.</div>}</div>}
-      <Textarea ref={inputRef} value={draft} onChange={(event) => { const nextDraft = event.target.value; setDraftMentions((current) => updateMentionSpans(current, draft, nextDraft)); setDraft(nextDraft); setActiveAppQuery(findActiveAppQuery(nextDraft, event.target.selectionStart)); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onClick={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyUp={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyDown={(event) => { if (event.key === "Escape") setActiveAppQuery(null); if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="composer-input" />
-      <div className="composer-footer"><div className="composer-tools"><Button type="button" variant="plain" size="icon" className="icon-button attach-button" aria-label="Attach a file"><Icon name="paperclip" size={17} /></Button><span className="composer-divider" /><span className="composer-hint">Nia can make mistakes. Check important info.</span></div><div className="composer-actions"><Button type="button" variant="plain" size="icon" className="icon-button voice-shortcut" aria-label="Open voice assistant" onClick={() => window.location.assign(withAppBasePath(chatId ? `/chat/${chatId}?mode=voice` : "/chat?mode=voice"))}><Icon name="voice" size={17} /></Button><Button type="submit" variant="solid" size="icon" className="send-button" aria-label="Send message" disabled={!draft.trim() || sending}><Icon name="send" size={17} /></Button></div></div>
-    </form><div className="composer-caption">Nia · Personal assistant</div></div>
+    <div className="fixed bottom-0 left-0 right-0 z-20 mx-auto w-[min(calc(100%-52px),730px)] bg-white pb-[17px] pt-3 max-[600px]:w-[calc(100%-28px)] max-[600px]:pb-[11px] lg:left-[calc(max(0px,(100vw-1440px)/2)+260px)] lg:right-[max(0px,calc((100vw-1440px)/2))]"><form className="relative rounded-[15px] border border-border bg-card px-3 pb-[9px] pt-[10px] shadow-[0_-8px_22px_rgb(20_30_22_/_5%)] transition focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary/10" onSubmit={sendMessage}>
+      {activeAppQuery && <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-[5] max-h-[260px] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl" role="listbox" aria-label="Connected apps">{matchingApps.length ? matchingApps.map((app) => <button key={app.id} type="button" role="option" aria-selected="false" className="flex min-h-[42px] w-full cursor-pointer items-center gap-[10px] rounded-lg bg-transparent px-[10px] py-2 text-left text-foreground hover:bg-muted focus-visible:bg-muted focus-visible:outline-none" onMouseDown={(event) => event.preventDefault()} onClick={() => selectMentionedApp(app)}>{app.logo ? <img className="h-[23px] w-[23px] rounded-md object-cover" src={app.logo} alt="" /> : <Icon name="code" size={16} />}<span>@{app.name}</span></button>) : <div className="px-[10px] py-3 text-[13px] text-muted-foreground">No matching connected apps.</div>}</div>}
+      <div className="flex min-w-0 items-end gap-1">
+        <Button type="button" variant="plain" size="icon" className="!h-[31px] !w-[31px] !shrink-0" aria-label="Attach a file"><Icon name="paperclip" size={17} /></Button>
+        <TextareaInput ref={inputRef} autoGrow value={draft} onChange={(event) => { const nextDraft = event.target.value; setDraftMentions((current) => updateMentionSpans(current, draft, nextDraft)); setDraft(nextDraft); setActiveAppQuery(findActiveAppQuery(nextDraft, event.target.selectionStart)); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 180)}px`; }} onClick={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyUp={(event) => setActiveAppQuery(findActiveAppQuery(event.currentTarget.value, event.currentTarget.selectionStart))} onKeyDown={(event) => { if (event.key === "Escape") setActiveAppQuery(null); if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Message Nia…" aria-label="Message Nia" rows={1} className="block min-h-[39px] max-h-[180px] min-w-0 flex-1 resize-none overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-[7px] py-2 text-[15px] leading-[1.55] text-foreground placeholder:text-muted-foreground" />
+        <Button type="button" variant="plain" size="icon" className="!h-[31px] !w-[31px] !shrink-0" aria-label="Open voice assistant" onClick={() => window.location.assign(withAppBasePath(chatId ? `/chat/${chatId}?mode=voice` : "/chat?mode=voice"))}><Icon name="voice" size={17} /></Button>
+        <Button type="submit" variant="solid" size="icon" className="!h-[31px] !w-[31px] !shrink-0 !rounded-[9px] !bg-primary" aria-label="Send message" disabled={!draft.trim() || sending}><Icon name="send" size={17} /></Button>
+      </div>
+    </form><p className="mb-0 mt-2 text-center text-[13px] text-muted-foreground">Nia can make mistakes. Check important info.</p></div>
   </section>;
 }
 
@@ -306,5 +297,5 @@ function ChatPageContent({ initialChatId, initialMessages, initialStatus, initia
 
 /** Wraps search parameter consumers so static prerendering can suspend safely. */
 export default function ChatPage(props: { initialChatId?: string; initialMessages?: Message[]; initialStatus?: string; initialApps?: ChatApp[] } = {}) {
-  return <Suspense fallback={<section className="chat-page" aria-busy="true" />}><ChatPageContent {...props} /></Suspense>;
+  return <Suspense fallback={<section className="flex min-h-0 flex-1 flex-col" aria-busy="true" />}><ChatPageContent {...props} /></Suspense>;
 }

@@ -5,11 +5,10 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@neup/core/database/prisma";
 import { prisma } from "@neup/core/database/prisma";
 
-export type UpdateApplicationState = { error?: string };
+export type CreateApplicationState = { error?: string };
 
-/** Validates and saves edits to an application catalog entry. */
-export async function updateApplication(_state: UpdateApplicationState, formData: FormData): Promise<UpdateApplicationState> {
-  const id = String(formData.get("id") ?? "").trim();
+/** Validates and saves an application catalog entry. */
+export async function createApplication(_state: CreateApplicationState, formData: FormData): Promise<CreateApplicationState> {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
@@ -20,9 +19,6 @@ export async function updateApplication(_state: UpdateApplicationState, formData
   const coverImage = String(formData.get("coverImage") ?? "").trim();
   const endpointsText = String(formData.get("endpoints") ?? "").trim();
 
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    return { error: "Application ID is invalid." };
-  }
   if (!name || !description || !category || !instructions || !authMethod || !endpointsText) {
     return { error: "Complete all required fields." };
   }
@@ -36,8 +32,7 @@ export async function updateApplication(_state: UpdateApplicationState, formData
   if (!Array.isArray(endpoints)) return { error: "Endpoints must be a JSON array." };
 
   try {
-    await prisma.application.update({
-      where: { id },
+    await prisma.application.create({
       data: {
         name,
         description,
@@ -50,11 +45,10 @@ export async function updateApplication(_state: UpdateApplicationState, formData
         coverImage: coverImage || null,
       },
     });
+    revalidatePath("/applications");
   } catch {
     return { error: "Could not save this application. Check the database and try again." };
   }
 
-  revalidatePath("/apps");
-  revalidatePath(`/apps/${id}`);
-  redirect(`/apps/${id}`);
+  redirect("/applications");
 }

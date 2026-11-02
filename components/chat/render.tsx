@@ -56,7 +56,7 @@ function renderMarkdownInline(text: string): ReactNode[] {
     const isDouble = token.startsWith("**") || token.startsWith("__");
     const content = token.slice(isDouble ? 2 : 1, isDouble ? -2 : -1);
     const key = `markdown-inline-${index++}`;
-    if (token.startsWith("`")) nodes.push(<code key={key} className="markdown-inline-code">{content}</code>);
+    if (token.startsWith("`")) nodes.push(<code key={key} className="rounded bg-muted px-[5px] py-px font-mono text-[.9em]">{content}</code>);
     else if (isDouble) nodes.push(<strong key={key}>{renderTextWithLinks(content)}</strong>);
     else nodes.push(<em key={key}>{renderTextWithLinks(content)}</em>);
     cursor = start + token.length;
@@ -83,7 +83,7 @@ function renderMarkdownHtml(text: string, keyPrefix: string): ReactNode[] {
   const leadingText = normalizedText.slice(0, htmlStart);
   if (leadingText.trim()) nodes.push(...renderMarkdownText(leadingText, `${keyPrefix}-text`));
   const html = sanitizeNiaHtml(normalizedText.slice(htmlStart));
-  nodes.push(<div key={`${keyPrefix}-html`} className="chat-html-card" dangerouslySetInnerHTML={{ __html: html }} />);
+  nodes.push(<div key={`${keyPrefix}-html`} className="max-w-full overflow-x-auto [&>article]:box-border [&>article]:max-w-full [&>section]:box-border [&>section]:max-w-full [&>div]:box-border [&>div]:max-w-full [&_img]:max-w-full [&_img]:object-cover [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2" dangerouslySetInnerHTML={{ __html: html }} />);
   return nodes;
 }
 
@@ -103,17 +103,17 @@ function renderNiaTags(text: string, keyPrefix: string): ReactNode[] {
       const Tag = tag;
       nodes.push(<Tag key={key}>{renderMarkdownInline(content)}</Tag>);
     } else if (tag === "code") {
-      nodes.push(<pre key={key} className="nia-code"><code>{content}</code></pre>);
+      nodes.push(<pre key={key} className="overflow-x-auto whitespace-pre-wrap rounded-lg border border-border bg-muted p-3"><code className="font-mono text-[13px]">{content}</code></pre>);
     } else if (tag === "image" || tag === "imageupload") {
       const images = parseImages(content);
       const urls = images.length ? images : /^https?:\/\//i.test(content) ? [content] : [];
       nodes.push(urls.length ? <ChatImages key={key} images={urls} /> : <p key={key}>{content}</p>);
     } else if (tag === "fileupload" || tag === "filesupload") {
       const files = content.split(/\r?\n/).map((file) => file.trim()).filter(Boolean);
-      nodes.push(<ul key={key} className="nia-files">{files.map((file) => <li key={file}>{/^https?:\/\//i.test(file) ? <a href={file} target="_blank" rel="noreferrer">{file}</a> : file}</li>)}</ul>);
+      nodes.push(<ul key={key} className="mb-0 list-disc pl-[22px]">{files.map((file) => <li key={file}>{/^https?:\/\//i.test(file) ? <a className="break-all text-primary underline underline-offset-2" href={file} target="_blank" rel="noreferrer">{file}</a> : file}</li>)}</ul>);
     } else if (tag === "list") {
       const items = content.split(/\r?\n/).map((item) => item.replace(/^\s*[-*•]\s*/, "").trim()).filter(Boolean);
-      nodes.push(<ul key={key} className="nia-list">{items.map((item, itemIndex) => <li key={itemIndex}>{renderTextWithLinks(item)}</li>)}</ul>);
+      nodes.push(<ul key={key} className="mb-0 list-disc pl-[22px]">{items.map((item, itemIndex) => <li key={itemIndex}>{renderTextWithLinks(item)}</li>)}</ul>);
     } else if (tag === "table") {
       nodes.push(renderNiaTable(content, key));
     }
@@ -161,7 +161,8 @@ function renderTableRows(rows: string[][], alignment: Array<"left" | "center" | 
   if (!rows.length) return null;
   const columnCount = Math.max(...rows.map((row) => row.length));
   const normalizedRows = rows.map((row) => Array.from({ length: columnCount }, (_, index) => row[index] ?? ""));
-  return <div key={key} className="nia-table-wrap"><table className="nia-table"><thead><tr>{normalizedRows[0].map((cell, cellIndex) => <th key={cellIndex} style={{ textAlign: alignment[cellIndex] ?? "left" }}>{renderMarkdownInline(cell)}</th>)}</tr></thead><tbody>{normalizedRows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={{ textAlign: alignment[cellIndex] ?? "left" }}>{renderMarkdownInline(cell)}</td>)}</tr>)}</tbody></table></div>;
+  const cellClass = "min-w-24 border-b border-border px-3 py-[9px] align-top [&+*]:border-l [&+*]:border-border";
+  return <div key={key} className="max-w-full overflow-x-auto rounded-[10px] border border-border bg-card"><table className="w-full border-separate border-spacing-0 text-sm leading-[1.55]"><thead><tr>{normalizedRows[0].map((cell, cellIndex) => <th key={cellIndex} className={`${cellClass} whitespace-nowrap bg-muted font-semibold text-foreground`} style={{ textAlign: alignment[cellIndex] ?? "left" }}>{renderMarkdownInline(cell)}</th>)}</tr></thead><tbody>{normalizedRows.slice(1).map((row, rowIndex) => <tr key={rowIndex} className="even:bg-background">{row.map((cell, cellIndex) => <td key={cellIndex} className={`${cellClass} last:border-b-0`} style={{ textAlign: alignment[cellIndex] ?? "left" }}>{renderMarkdownInline(cell)}</td>)}</tr>)}</tbody></table></div>;
 }
 
 /** Renders Markdown pipe tables while preserving the text around each table. */
@@ -239,7 +240,7 @@ function renderMarkdownText(text: string, keyPrefix: string): ReactNode[] {
         index += 1;
       }
       const List = ordered ? "ol" : "ul";
-      nodes.push(<List key={`${keyPrefix}-${index++}`} className="markdown-list">{items.map((item, itemIndex) => <li key={itemIndex}>{renderMarkdownInline(item)}</li>)}</List>);
+      nodes.push(<List key={`${keyPrefix}-${index++}`} className="m-0 list-outside pl-6 text-[15px] leading-[1.75]">{items.map((item, itemIndex) => <li key={itemIndex}>{renderMarkdownInline(item)}</li>)}</List>);
       continue;
     }
 
@@ -399,6 +400,6 @@ function renderBlock(block: ChatBlock, key: number): ReactNode {
 /** Renders chat text with explicit links and supported estate, activity, and image blocks. */
 export function renderChatContent(text: string, toolFormats: ToolFormatHint[] = []): ReactNode[] {
   return splitChatBlocks(text, toolFormats).map((part, index) => typeof part === "string"
-    ? part.trim() ? <div key={index} className="chat-rich-text">{renderNiaTags(part, `text-${index}`)}</div> : null
+    ? part.trim() ? <div key={index} className="[&>*+*]:mt-[10px] [&_h1]:mb-0 [&_h1]:text-[22px] [&_h1]:font-semibold [&_h1]:leading-[1.35] [&_h1]:text-foreground [&_h2]:mb-0 [&_h2]:text-[19px] [&_h2]:font-semibold [&_h2]:leading-[1.35] [&_h2]:text-foreground [&_h3]:mb-0 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:leading-[1.35] [&_h3]:text-foreground [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2">{renderNiaTags(part, `text-${index}`)}</div> : null
     : renderBlock(part, index)).filter((part): part is ReactNode => part !== null);
 }

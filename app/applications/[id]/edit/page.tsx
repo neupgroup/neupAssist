@@ -29,17 +29,11 @@ export default async function EditApplicationPage({ params }: { params: Promise<
   if (!application) notFound();
 
   return (
-    <section className="keys-page">
-      <header className="topbar">
-        <div className="breadcrumb"><Link href="/apps">Apps and Integrations</Link><span className="crumb-slash">/</span><Link href={`/apps/${application.id}`}>{application.name}</Link><span className="crumb-slash">/</span><strong>Edit</strong></div>
-        <Link href={`/apps/${application.id}`} className="text-sm text-[#738177] hover:text-[#365e45]">Back to application</Link>
-      </header>
-      <div className="keys-content">
-        <div className="page-intro">
-          <div className="page-icon"><Icon name="code" size={19} /></div>
-          <p className="page-eyebrow">APPLICATION CATALOG</p>
+    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-[min(calc(100%-60px),980px)] py-[39px] pb-[42px] max-[760px]:w-[min(calc(100%-40px),980px)] max-[760px]:pt-7 max-[600px]:w-[calc(100%-30px)] max-[600px]:pt-[22px]">
+        <div className="mb-[25px] [&_h1]:m-0 [&_h1]:text-[clamp(35px,4vw,47px)] [&_h1]:font-medium [&_h1]:tracking-[-.055em] [&_h1]:text-foreground [&_p]:mb-0 [&_p]:mt-2 [&_p]:text-[15px] [&_p]:text-muted-foreground">
           <h1>Edit application</h1>
-          <p className="page-description">Update the application details and the endpoints it provides.</p>
+          <p className="mt-2 text-[15px] text-muted-foreground">Update the application details and the endpoints it provides.</p>
         </div>
         <EditApplicationForm application={{
           ...application,

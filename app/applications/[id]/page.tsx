@@ -6,6 +6,7 @@ import { ensureAccount } from "@neup/shared/account/self";
 import { discoverMcpTools, type McpToolDefinition } from "@/services/mcp/client";
 import { connectApplication } from "./connect-action";
 import { getPublicAccountToken } from "@/services/request/auth";
+import { Icon } from "@/app/ui-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -111,28 +112,21 @@ export default async function ApplicationDetailsPage({ params, searchParams }: {
   if (!application && !error) notFound();
 
   return (
-    <section className="keys-page">
-      <header className="topbar">
-        <div className="breadcrumb"><Link href="/apps">Apps and Integrations</Link><span className="crumb-slash">/</span><strong>{application?.name ?? "Application"}</strong></div>
-        <div className="flex items-center gap-4">
-          <Link href={`/apps/${application?.id}/edit`} className="text-sm text-[#738177] hover:text-[#365e45]">Edit application</Link>
-          <Link href="/apps" className="text-sm text-[#738177] hover:text-[#365e45]">Back to apps</Link>
-        </div>
-      </header>
-      <div className="keys-content">
+    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-[min(calc(100%-60px),980px)] py-[39px] pb-[42px] max-[760px]:w-[min(calc(100%-40px),980px)] max-[760px]:pt-7 max-[600px]:w-[calc(100%-30px)] max-[600px]:pt-[22px]">
         {error || !application ? (
-          <div className="api-card keys-empty" role="status">Could not load this application. Check the database and try again.</div>
+          <div className="rounded-xl border border-border bg-card p-[18px] flex min-h-[110px] items-center justify-center gap-[9px] rounded-lg border border-dashed border-border text-sm text-muted-foreground" role="status">Could not load this application. Check the database and try again.</div>
         ) : (
           <>
-            <div className="page-intro">
+            <div className="mb-[25px] [&_h1]:m-0 [&_h1]:text-[clamp(35px,4vw,47px)] [&_h1]:font-medium [&_h1]:tracking-[-.055em] [&_h1]:text-foreground [&_p]:mb-0 [&_p]:mt-2 [&_p]:text-[15px] [&_p]:text-muted-foreground">
               {application.coverImage && <img src={application.coverImage} alt="" className="mb-5 h-44 w-full rounded-xl object-cover" />}
-              <div className="flex items-center gap-3">{application.displayImage ? <img src={application.displayImage} alt="" className="h-12 w-12 rounded-xl border border-[#e4eae1] object-cover" /> : <div className="page-icon"><span aria-hidden="true" className="text-lg">⌘</span></div>}
+              <div className="flex items-center gap-3">{application.displayImage ? <img src={application.displayImage} alt="" className="h-12 w-12 rounded-xl border border-[#e4eae1] object-cover" /> : <div className="page-icon"><Icon name="code" size={20} /></div>}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <h1>{application.name}</h1>
                 <span className="rounded-full bg-[#edf4ec] px-3 py-1 text-xs font-semibold text-[#5b8062]">{application.category}</span>
               </div>
-              <p className="page-description">{application.description}</p>
+              <p className="mt-2 text-[15px] text-muted-foreground">{application.description}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 {isConnected ? (
                   <span className="rounded-lg border border-[#dce8dc] bg-[#edf4ec] px-4 py-2 text-sm font-semibold text-[#52785e]">Connected</span>
@@ -151,12 +145,12 @@ export default async function ApplicationDetailsPage({ params, searchParams }: {
               <div className="mb-4">
                 <div className="flex items-center gap-3">
                   <h2 id="application-mcp-heading" className="mb-0 text-2xl font-semibold text-[#354a39]">Available actions</h2>
-                  <span className="key-count">{mcpServers.reduce((count, server) => count + server.tools.length, 0)}</span>
+                  <span className="grid h-7 min-w-7 place-items-center rounded-lg bg-primary/10 text-[13px] font-semibold text-primary">{mcpServers.reduce((count, server) => count + server.tools.length, 0)}</span>
                 </div>
                 <p className="mb-0 mt-2 text-sm leading-6 text-[#69756c]">Actions this application can perform through its connected endpoints.</p>
               </div>
               {mcpServers.length === 0 ? (
-                <div className="keys-empty">No MCP endpoints are listed for this application.</div>
+                <div className="flex min-h-[110px] items-center justify-center gap-[9px] rounded-lg border border-dashed border-border text-sm text-muted-foreground">No MCP endpoints are listed for this application.</div>
               ) : (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {mcpServers.flatMap((server) => server.tools.map((tool) => ({ server, tool }))).map(({ server, tool }) => (

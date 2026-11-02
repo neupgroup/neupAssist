@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Icon } from "@/app/ui-icon";
 
 type PropertyRecord = Record<string, unknown>;
 
@@ -53,7 +54,7 @@ export function EstateSavedProperty({ property: rawProperty }: { property: Prope
 
   return <article className="mb-3 flex w-full max-w-[460px] items-center gap-3 rounded-[11px] bg-white p-0">
     <span className="grid h-[88px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-[11px] border border-[#e6ebe4] bg-[#edf3ec] text-2xl text-[#5d7c63]" aria-hidden="true">
-      {image ? <Image className="block h-full w-full object-cover" src={image} alt="" width={96} height={88} unoptimized /> : "⌂"}
+      {image ? <Image className="block h-full w-full object-cover" src={image} alt="" width={96} height={88} unoptimized /> : <Icon name="home" size={24} />}
     </span>
     <div className="grid min-w-0 gap-[2px] p-3">
       <strong className="text-[15px] font-semibold text-[#435046]">{displayTitle}</strong>

@@ -11,5 +11,5 @@ export function sanitizeNiaHtml(html: string): string {
 
 /** Inserts sanitized HTML into an app block without interpreting it as Markdown. */
 export function SafeNiaHtml({ html, className }: { html: string; className?: string }) {
-  return <div className={`chat-html-card ${className ?? ""}`} dangerouslySetInnerHTML={{ __html: sanitizeNiaHtml(html) }} />;
+  return <div className={`max-w-full overflow-x-auto [&>article]:box-border [&>article]:max-w-full [&>section]:box-border [&>section]:max-w-full [&>div]:box-border [&>div]:max-w-full [&_img]:max-w-full [&_img]:object-cover [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 ${className ?? ""}`} dangerouslySetInnerHTML={{ __html: sanitizeNiaHtml(html) }} />;
 }

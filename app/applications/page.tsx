@@ -70,16 +70,11 @@ export default async function AppsAndIntegrationsPage() {
   const installedApplicationIdSet = new Set(installedApplicationIds);
 
   return (
-    <section className="keys-page">
-      <header className="topbar">
-        <div className="breadcrumb"><span>Workspace</span><span className="crumb-slash">/</span><strong>Apps and Integrations</strong></div>
-      </header>
-      <div className="keys-content">
-        <div className="page-intro">
-          <div className="page-icon"><span aria-hidden="true" className="text-lg">⌘</span></div>
-          <p className="page-eyebrow">CONNECTED SERVICES</p>
+    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-[min(calc(100%-60px),980px)] py-[39px] pb-[42px] max-[760px]:w-[min(calc(100%-40px),980px)] max-[760px]:pt-7 max-[600px]:w-[calc(100%-30px)] max-[600px]:pt-[22px]">
+        <div className="mb-[25px] [&_h1]:m-0 [&_h1]:text-[clamp(35px,4vw,47px)] [&_h1]:font-medium [&_h1]:tracking-[-.055em] [&_h1]:text-foreground [&_p]:mb-0 [&_p]:mt-2 [&_p]:text-[15px] [&_p]:text-muted-foreground">
           <h1>Apps and Integrations</h1>
-          <p className="page-description">Browse and connect applications for your workspace.</p>
+          <p className="mt-2 text-[15px] text-muted-foreground">Browse and connect applications for your workspace.</p>
         </div>
 
         <label className="mb-5 block">
@@ -88,15 +83,15 @@ export default async function AppsAndIntegrationsPage() {
         </label>
 
         {error ? (
-          <div className="api-card keys-empty" role="status">Could not load apps and integrations from the database.</div>
+          <div className="rounded-xl border border-border bg-card p-[18px] flex min-h-[110px] items-center justify-center gap-[9px] rounded-lg border border-dashed border-border text-sm text-muted-foreground" role="status">Could not load apps and integrations from the database.</div>
         ) : (
           <section aria-label="Applications">
             {applications.length === 0 ? (
-              <div className="keys-empty">No applications have been added yet.</div>
+              <div className="flex min-h-[110px] items-center justify-center gap-[9px] rounded-lg border border-dashed border-border text-sm text-muted-foreground">No applications have been added yet.</div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {applications.map((application) => (
-                  <Link key={application.id} href={`/apps/${application.id}`} className="block rounded-lg border border-[#edf0ec] bg-white p-4 transition-colors hover:border-[#c8d7c8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#78927b]">
+                  <Link key={application.id} href={`/applications/${application.id}`} className="block rounded-lg border border-[#edf0ec] bg-white p-4 transition-colors hover:border-[#c8d7c8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#78927b]">
                     <div className="flex items-center gap-3">
                       {application.displayImage && <img src={application.displayImage} alt="" className="h-10 w-10 rounded-lg border border-[#edf0ec] object-cover" />}
                       <div>

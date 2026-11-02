@@ -1,265 +1,281 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-  --background: 0 0% 100%;
-  --foreground: 165 16% 14%;
-  --card: 0 0% 100%;
-  --card-foreground: 165 16% 14%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 165 16% 14%;
-  --primary: 157 28% 35%;
-  --primary-foreground: 0 0% 100%;
-  --primary-hover: 157 30% 30%;
-  --primary-active: 157 32% 26%;
-  --secondary: 150 15% 95%;
-  --secondary-foreground: 165 15% 22%;
-  --muted: 150 12% 95%;
-  --muted-foreground: 160 6% 46%;
-  --accent: 150 14% 92%;
-  --accent-foreground: 165 16% 18%;
-  --destructive: 0 68% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 150 10% 89%;
-  --input: 150 10% 86%;
-  --ring: 157 28% 35%;
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 165 16% 14%;
-  --interaction-hover: 150 14% 92%;
-  --interaction-press: 150 14% 88%;
-  --radius: 0.75rem;
-  font-family: "Outfit", sans-serif;
-  letter-spacing: -0.01em;
-}
-
 @layer base {
-  * { @apply border-border; box-sizing: border-box; }
-  html, body { min-height: 100%; }
-  body { @apply bg-background text-foreground; margin: 0; }
-  button, input, textarea { font: inherit; }
-  button { color: inherit; }
-  a { color: inherit; text-decoration: none; }
-  ::selection { background: hsl(var(--primary) / .16); }
+
+  :root {
+    --primary: 60 100% 10%;
+    --secondary: var(--primary);
+    --tertiary: var(--primary);
+    --success: #16834a;
+    --informatic: #2472c8;
+    --warning: #bd7200;
+    --danger: #cf3344;
+    --success-foreground: white;
+    --success-hover: color-mix(in srgb, var(--success) 90%, black);
+    --success-press: color-mix(in srgb, var(--success) 78%, black);
+    --informatic-foreground: white;
+    --informatic-hover: color-mix(in srgb, var(--informatic) 90%, black);
+    --informatic-press: color-mix(in srgb, var(--informatic) 78%, black);
+    --warning-foreground: white;
+    --warning-hover: color-mix(in srgb, var(--warning) 90%, black);
+    --warning-press: color-mix(in srgb, var(--warning) 78%, black);
+    --danger-foreground: white;
+    --danger-hover: color-mix(in srgb, var(--danger) 90%, black);
+    --danger-press: color-mix(in srgb, var(--danger) 78%, black);
+  }
+
+  :root,
+  [data-theme="light"] {
+    --primary-0: #000000;
+    --primary-10: color-mix(in srgb, hsl(var(--primary)) 1%, white);
+    --primary-20: color-mix(in srgb, hsl(var(--primary)) 2%, white);
+    --primary-30: color-mix(in srgb, hsl(var(--primary)) 3%, white);
+    --primary-40: color-mix(in srgb, hsl(var(--primary)) 4%, white);
+    --primary-960: color-mix(in srgb, hsl(var(--primary)) 96%, white);
+    --primary-970: color-mix(in srgb, hsl(var(--primary)) 97%, white);
+    --primary-980: color-mix(in srgb, hsl(var(--primary)) 98%, white);
+    --primary-990: color-mix(in srgb, hsl(var(--primary)) 99%, white);
+    --primary-1000: #ffffff;
+    --primary-50: color-mix(in srgb, hsl(var(--primary)) 5%, white);
+    --primary-100: color-mix(in srgb, hsl(var(--primary)) 10%, white);
+    --primary-200: color-mix(in srgb, hsl(var(--primary)) 20%, white);
+    --primary-300: color-mix(in srgb, hsl(var(--primary)) 30%, white);
+    --primary-400: color-mix(in srgb, hsl(var(--primary)) 40%, white);
+    --primary-500: color-mix(in srgb, hsl(var(--primary)) 50%, white);
+    --primary-600: color-mix(in srgb, hsl(var(--primary)) 60%, white);
+    --primary-700: color-mix(in srgb, hsl(var(--primary)) 70%, white);
+    --primary-800: color-mix(in srgb, hsl(var(--primary)) 80%, white);
+    --primary-900: color-mix(in srgb, hsl(var(--primary)) 90%, white);
+    --primary-950: color-mix(in srgb, hsl(var(--primary)) 95%, white);
+    --secondary-0: #000000;
+    --secondary-10: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 1%, white);
+    --secondary-20: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 2%, white);
+    --secondary-30: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 3%, white);
+    --secondary-40: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 4%, white);
+    --secondary-960: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 96%, white);
+    --secondary-970: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 97%, white);
+    --secondary-980: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 98%, white);
+    --secondary-990: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 99%, white);
+    --secondary-1000: #ffffff;
+    --secondary-50: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 5%, white);
+    --secondary-100: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 10%, white);
+    --secondary-200: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 20%, white);
+    --secondary-300: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 30%, white);
+    --secondary-400: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 40%, white);
+    --secondary-500: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 50%, white);
+    --secondary-600: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 60%, white);
+    --secondary-700: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 70%, white);
+    --secondary-800: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 80%, white);
+    --secondary-900: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 90%, white);
+    --secondary-950: color-mix(in srgb, hsl(var(--secondary, var(--primary))) 95%, white);
+    --tertiary-0: #000000;
+    --tertiary-10: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 1%, white);
+    --tertiary-20: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 2%, white);
+    --tertiary-30: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 3%, white);
+    --tertiary-40: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 4%, white);
+    --tertiary-960: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 96%, white);
+    --tertiary-970: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 97%, white);
+    --tertiary-980: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 98%, white);
+    --tertiary-990: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 99%, white);
+    --tertiary-1000: #ffffff;
+    --tertiary-50: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 5%, white);
+    --tertiary-100: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 10%, white);
+    --tertiary-200: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 20%, white);
+    --tertiary-300: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 30%, white);
+    --tertiary-400: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 40%, white);
+    --tertiary-500: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 50%, white);
+    --tertiary-600: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 60%, white);
+    --tertiary-700: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 70%, white);
+    --tertiary-800: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 80%, white);
+    --tertiary-900: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 90%, white);
+    --tertiary-950: color-mix(in srgb, hsl(var(--tertiary, var(--primary))) 95%, white);
+    --success-0: #000000;
+    --success-10: color-mix(in srgb, var(--success) 1%, white);
+    --success-20: color-mix(in srgb, var(--success) 2%, white);
+    --success-30: color-mix(in srgb, var(--success) 3%, white);
+    --success-40: color-mix(in srgb, var(--success) 4%, white);
+    --success-960: color-mix(in srgb, var(--success) 96%, white);
+    --success-970: color-mix(in srgb, var(--success) 97%, white);
+    --success-980: color-mix(in srgb, var(--success) 98%, white);
+    --success-990: color-mix(in srgb, var(--success) 99%, white);
+    --success-1000: #ffffff;
+    --success-50: color-mix(in srgb, var(--success) 5%, white);
+    --success-100: color-mix(in srgb, var(--success) 10%, white);
+    --success-200: color-mix(in srgb, var(--success) 20%, white);
+    --success-300: color-mix(in srgb, var(--success) 30%, white);
+    --success-400: color-mix(in srgb, var(--success) 40%, white);
+    --success-500: color-mix(in srgb, var(--success) 50%, white);
+    --success-600: color-mix(in srgb, var(--success) 60%, white);
+    --success-700: color-mix(in srgb, var(--success) 70%, white);
+    --success-800: color-mix(in srgb, var(--success) 80%, white);
+    --success-900: color-mix(in srgb, var(--success) 90%, white);
+    --success-950: color-mix(in srgb, var(--success) 95%, white);
+    --informatic-0: #000000;
+    --informatic-10: color-mix(in srgb, var(--informatic) 1%, white);
+    --informatic-20: color-mix(in srgb, var(--informatic) 2%, white);
+    --informatic-30: color-mix(in srgb, var(--informatic) 3%, white);
+    --informatic-40: color-mix(in srgb, var(--informatic) 4%, white);
+    --informatic-960: color-mix(in srgb, var(--informatic) 96%, white);
+    --informatic-970: color-mix(in srgb, var(--informatic) 97%, white);
+    --informatic-980: color-mix(in srgb, var(--informatic) 98%, white);
+    --informatic-990: color-mix(in srgb, var(--informatic) 99%, white);
+    --informatic-1000: #ffffff;
+    --informatic-50: color-mix(in srgb, var(--informatic) 5%, white);
+    --informatic-100: color-mix(in srgb, var(--informatic) 10%, white);
+    --informatic-200: color-mix(in srgb, var(--informatic) 20%, white);
+    --informatic-300: color-mix(in srgb, var(--informatic) 30%, white);
+    --informatic-400: color-mix(in srgb, var(--informatic) 40%, white);
+    --informatic-500: color-mix(in srgb, var(--informatic) 50%, white);
+    --informatic-600: color-mix(in srgb, var(--informatic) 60%, white);
+    --informatic-700: color-mix(in srgb, var(--informatic) 70%, white);
+    --informatic-800: color-mix(in srgb, var(--informatic) 80%, white);
+    --informatic-900: color-mix(in srgb, var(--informatic) 90%, white);
+    --informatic-950: color-mix(in srgb, var(--informatic) 95%, white);
+    --warning-0: #000000;
+    --warning-10: color-mix(in srgb, var(--warning) 1%, white);
+    --warning-20: color-mix(in srgb, var(--warning) 2%, white);
+    --warning-30: color-mix(in srgb, var(--warning) 3%, white);
+    --warning-40: color-mix(in srgb, var(--warning) 4%, white);
+    --warning-960: color-mix(in srgb, var(--warning) 96%, white);
+    --warning-970: color-mix(in srgb, var(--warning) 97%, white);
+    --warning-980: color-mix(in srgb, var(--warning) 98%, white);
+    --warning-990: color-mix(in srgb, var(--warning) 99%, white);
+    --warning-1000: #ffffff;
+    --warning-50: color-mix(in srgb, var(--warning) 5%, white);
+    --warning-100: color-mix(in srgb, var(--warning) 10%, white);
+    --warning-200: color-mix(in srgb, var(--warning) 20%, white);
+    --warning-300: color-mix(in srgb, var(--warning) 30%, white);
+    --warning-400: color-mix(in srgb, var(--warning) 40%, white);
+    --warning-500: color-mix(in srgb, var(--warning) 50%, white);
+    --warning-600: color-mix(in srgb, var(--warning) 60%, white);
+    --warning-700: color-mix(in srgb, var(--warning) 70%, white);
+    --warning-800: color-mix(in srgb, var(--warning) 80%, white);
+    --warning-900: color-mix(in srgb, var(--warning) 90%, white);
+    --warning-950: color-mix(in srgb, var(--warning) 95%, white);
+    --danger-0: #000000;
+    --danger-10: color-mix(in srgb, var(--danger) 1%, white);
+    --danger-20: color-mix(in srgb, var(--danger) 2%, white);
+    --danger-30: color-mix(in srgb, var(--danger) 3%, white);
+    --danger-40: color-mix(in srgb, var(--danger) 4%, white);
+    --danger-960: color-mix(in srgb, var(--danger) 96%, white);
+    --danger-970: color-mix(in srgb, var(--danger) 97%, white);
+    --danger-980: color-mix(in srgb, var(--danger) 98%, white);
+    --danger-990: color-mix(in srgb, var(--danger) 99%, white);
+    --danger-1000: #ffffff;
+    --danger-50: color-mix(in srgb, var(--danger) 5%, white);
+    --danger-100: color-mix(in srgb, var(--danger) 10%, white);
+    --danger-200: color-mix(in srgb, var(--danger) 20%, white);
+    --danger-300: color-mix(in srgb, var(--danger) 30%, white);
+    --danger-400: color-mix(in srgb, var(--danger) 40%, white);
+    --danger-500: color-mix(in srgb, var(--danger) 50%, white);
+    --danger-600: color-mix(in srgb, var(--danger) 60%, white);
+    --danger-700: color-mix(in srgb, var(--danger) 70%, white);
+    --danger-800: color-mix(in srgb, var(--danger) 80%, white);
+    --danger-900: color-mix(in srgb, var(--danger) 90%, white);
+    --danger-950: color-mix(in srgb, var(--danger) 95%, white);
+    --background: var(--primary-50);
+    --foreground: var(--primary-950);
+    --card: white;
+    --card-foreground: var(--foreground);
+    --popover: white;
+    --popover-foreground: var(--foreground);
+    --primary-foreground: white;
+    --danger-foreground: white;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --primary-hover: color-mix(in srgb, hsl(var(--primary)) 90%, black);
+    --primary-press: color-mix(in srgb, hsl(var(--primary)) 78%, black);
+    --primary-active: color-mix(in srgb, hsl(var(--primary)) 86%, black);
+    --primary-active-hover: color-mix(in srgb, hsl(var(--primary)) 72%, black);
+    --primary-active-press: color-mix(in srgb, hsl(var(--primary)) 60%, black);
+    --interaction-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
+    --interaction-press: color-mix(in srgb, var(--foreground) 10%, transparent);
+    --interaction-active: color-mix(in srgb, var(--foreground) 12%, transparent);
+    --interaction-active-hover: color-mix(in srgb, var(--foreground) 17%, transparent);
+    --interaction-active-press: color-mix(in srgb, var(--foreground) 24%, transparent);
+    --secondary-color: var(--secondary-100);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--primary-100);
+    --muted-foreground: var(--primary-700);
+    --accent: var(--tertiary-100);
+    --accent-foreground: var(--foreground);
+    --destructive: var(--danger);
+    --destructive-foreground: white;
+    --border: var(--primary-200);
+    --input: var(--primary-200);
+    --ring: var(--primary-500);
+    --radius: 1.25rem;
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: hsl(var(--primary));
+    --sidebar-primary-foreground: white;
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
+  }
+
+  [data-theme="dark"],
+  .dark {
+    --success-hover: color-mix(in srgb, var(--success) 88%, white);
+    --success-press: color-mix(in srgb, var(--success) 76%, white);
+    --informatic-hover: color-mix(in srgb, var(--informatic) 88%, white);
+    --informatic-press: color-mix(in srgb, var(--informatic) 76%, white);
+    --warning-hover: color-mix(in srgb, var(--warning) 88%, white);
+    --warning-press: color-mix(in srgb, var(--warning) 76%, white);
+    --danger-hover: color-mix(in srgb, var(--danger) 88%, white);
+    --danger-press: color-mix(in srgb, var(--danger) 76%, white);
+    --background: var(--primary-950);
+    --foreground: var(--primary-50);
+    --card: var(--primary-900);
+    --card-foreground: var(--foreground);
+    --popover: var(--primary-900);
+    --popover-foreground: var(--foreground);
+    --primary-foreground: white;
+    --danger-foreground: white;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --primary-hover: color-mix(in srgb, hsl(var(--primary)) 88%, white);
+    --primary-press: color-mix(in srgb, hsl(var(--primary)) 78%, white);
+    --primary-active: color-mix(in srgb, hsl(var(--primary)) 84%, white);
+    --primary-active-hover: color-mix(in srgb, hsl(var(--primary)) 74%, white);
+    --primary-active-press: color-mix(in srgb, hsl(var(--primary)) 64%, white);
+    --interaction-hover: color-mix(in srgb, var(--foreground) 8%, transparent);
+    --interaction-press: color-mix(in srgb, var(--foreground) 13%, transparent);
+    --interaction-active: color-mix(in srgb, var(--foreground) 12%, transparent);
+    --interaction-active-hover: color-mix(in srgb, var(--foreground) 18%, transparent);
+    --interaction-active-press: color-mix(in srgb, var(--foreground) 25%, transparent);
+    --secondary-color: var(--secondary-900);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--primary-900);
+    --muted-foreground: var(--primary-300);
+    --accent: var(--tertiary-900);
+    --accent-foreground: var(--foreground);
+    --destructive: var(--danger);
+    --destructive-foreground: white;
+    --border: var(--primary-800);
+    --input: var(--primary-800);
+    --ring: var(--primary-400);
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: hsl(var(--primary));
+    --sidebar-primary-foreground: white;
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
+  }
+
 }
 
-.icon-button { color: #737c75 !important; }
-.icon-button:hover { color: hsl(var(--foreground)) !important; }
-.chat-page, .keys-page { display: flex; min-height: 0; flex: 1; flex-direction: column; }
-.topbar { position: relative; z-index: 1; display: flex; height: 61px; flex: 0 0 61px; align-items: center; justify-content: space-between; padding: 0 34px; border-bottom: 1px solid hsl(var(--border) / .72); background: hsl(var(--background) / .75); box-shadow: 0 3px 12px rgb(32 48 38 / 5%); }
-.breadcrumb { display: flex; align-items: center; gap: 9px; color: #989f99; font-size: 14px; }
-.breadcrumb strong { color: #3e4942; font-weight: 600; }
-.crumb-slash { color: #c4c9c3; }
-.topbar-actions { display: flex; align-items: center; gap: 14px; }
-.model-status { display: flex; align-items: center; gap: 8px; color: #758078; font-size: 13px; }
-.topbar .icon-button { width: 33px !important; height: 33px !important; }
-.conversation-scroll { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; }
-.chat-empty { width: min(100% - 40px, 620px); margin: auto; padding: 30px 0 48px; text-align: center; }
-.greeting-icon { display: grid; width: 47px; height: 47px; margin: 0 auto 22px; place-items: center; border: 1px solid #e4eae1; border-radius: 16px; background: #fff; color: #63856b; box-shadow: 0 4px 18px #253a2909; }
-.greeting-overline, .page-eyebrow { margin: 0 0 12px; color: #77917a; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
-.chat-empty h1, .page-intro h1 { margin: 0; color: #26332c; font-size: clamp(35px, 4vw, 47px); font-weight: 500; letter-spacing: -.055em; line-height: 1.13; }
-.greeting-copy { max-width: 460px; margin: 15px auto 0; color: #858e87; font-size: 16px; line-height: 1.7; }
-.suggestion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 35px; text-align: left; }
-.suggestion-card { display: flex; min-height: 68px; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid #e9ece6; border-radius: 11px; background: #fff; text-align: left; cursor: pointer; transition: border .16s ease, transform .16s ease, box-shadow .16s ease; }
-.suggestion-card:hover { transform: translateY(-1px); border-color: #ccd9cd; box-shadow: 0 5px 16px #293a2d08; }
-.suggestion-symbol { display: grid; width: 33px; height: 33px; flex: 0 0 33px; place-items: center; border-radius: 10px; font-size: 16px; }
-.suggestion-symbol.sage { background: #eef4ed; color: #608168; }
-.suggestion-symbol.lilac { background: #f2eff8; color: #8071a0; }
-.suggestion-symbol.amber { background: #faf3e6; color: #a17e43; }
-.suggestion-symbol.blue { background: #edf3f6; color: #698697; }
-.suggestion-card > span:nth-child(2) { display: grid; min-width: 0; gap: 4px; }
-.suggestion-card strong { color: #47524a; font-size: 14px; font-weight: 600; }
-.suggestion-card small { overflow: hidden; color: #858f86; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.suggestion-arrow { margin-left: auto; color: #aab2aa; font-size: 14px; }
-.composer-wrap { position: relative; width: min(100% - 52px, 730px); margin: 0 auto; padding: 0 0 17px; }
-.mention-suggestions { position: absolute; z-index: 5; right: 0; bottom: calc(100% + 8px); left: 0; max-height: 260px; overflow-y: auto; padding: 6px; border: 1px solid #e3e9e1; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #26362c18; }
-.mention-suggestion { display: flex; width: 100%; min-height: 42px; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: #46534a; text-align: left; cursor: pointer; }
-.mention-suggestion:hover, .mention-suggestion:focus-visible { outline: none; background: #f1f5f0; }
-.mention-suggestion img { width: 23px; height: 23px; border-radius: 6px; object-fit: cover; }
-.mention-empty { padding: 12px 10px; color: #89928b; font-size: 13px; }
-.chat-app-mention { color: #456d4d; font-weight: 600; }
-.composer { position: relative; padding: 10px 12px 9px; border: 1px solid #e0e5de; border-radius: 15px; background: white; box-shadow: 0 5px 24px #26362c08; transition: border-color .18s ease, box-shadow .18s ease; }
-.composer:focus-within { border-color: #bdcfbf; box-shadow: 0 5px 24px #26362c0c, 0 0 0 3px #597f5b0b; }
-.composer-input { display: block; width: 100%; min-height: 39px !important; max-height: 180px; resize: none; padding: 8px 7px !important; border: 0 !important; border-radius: 7px !important; background: transparent !important; color: #344139 !important; font-size: 15px !important; line-height: 1.55; box-shadow: none !important; }
-.composer-input:focus { outline: none !important; }
-.composer-input::placeholder { color: #a0a7a1; }
-.composer-footer, .composer-tools, .composer-actions { display: flex; align-items: center; }
-.composer-footer { justify-content: space-between; margin-top: 4px; }
-.composer-tools { gap: 9px; }
-.composer-tools .icon-button, .composer-actions .icon-button { width: 31px !important; height: 31px !important; }
-.composer-divider { width: 1px; height: 15px; background: #e8ebe6; }
-.composer-hint { color: #89928b; font-size: 13px; }
-.composer-actions { gap: 6px; }
-.send-button { width: 31px !important; height: 31px !important; border-radius: 9px !important; background: #52785e !important; }
-.send-button:disabled { background: #dfe6df !important; color: #a4aea5 !important; }
-.composer-caption { padding-top: 8px; color: #89928b; font-size: 12px; text-align: center; }
-.message-list { width: min(100% - 52px, 720px); margin: 30px auto 45px; }
-.message { display: flex; gap: 13px; margin: 26px 0; }
-.message-user { justify-content: flex-end; }
-.message-user .message-body { max-width: 80%; padding: 12px 15px; border-radius: 14px 14px 4px 14px; background: #eaf0e9; color: #3b4a40; }
-.message-body p { margin: 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
-.message-body a { color: #416b4c; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
-.message-body a:hover { color: #2f5138; }
-.chat-rich-text > * + * { margin-top: 10px; }
-.chat-html-card { width: 100%; max-width: 100%; overflow-x: auto; }
-.chat-html-card > article, .chat-html-card > section, .chat-html-card > div { box-sizing: border-box; max-width: 100%; }
-.chat-html-card img { max-width: 100%; object-fit: cover; }
-.chat-html-card a { color: #52785e; text-decoration: underline; text-underline-offset: 2px; }
-.nia-phone-block, .nia-lead-block { width: 100%; max-width: 460px; margin: 0 0 12px; overflow: hidden; border: 1px solid #e5ebe3; border-radius: 12px; background: #fff; }
-.nia-phone-block { padding: 12px 14px; }
-.nia-lead-block { padding: 13px; }
-.nia-warning-block { display: flex; width: 100%; max-width: 560px; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border: 1px solid #f0d7a7; border-radius: 10px; background: #fffaf0; color: #745923; }
-.nia-warning-icon { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border-radius: 50%; background: #f8e9c9; color: #8a641d; font-size: 13px; font-weight: 700; }
-.nia-warning-block .chat-html-card { min-width: 0; }
-.chat-rich-text h1, .chat-rich-text h2, .chat-rich-text h3 { margin-bottom: 0; color: #354a39; font-weight: 650; line-height: 1.35; }
-.chat-rich-text h1 { font-size: 22px; }
-.chat-rich-text h2 { font-size: 19px; }
-.chat-rich-text h3 { font-size: 16px; }
-.nia-code { overflow-x: auto; border: 1px solid #e5eae3; border-radius: 9px; background: #f7f9f6; padding: 12px; white-space: pre-wrap; }
-.nia-code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.nia-list, .nia-files { margin-bottom: 0; padding-left: 22px; }
-.markdown-list { margin: 0; padding-left: 24px; font-size: 15px; line-height: 1.75; }
-.markdown-inline-code { border-radius: 4px; background: #f0f3ef; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-.nia-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid #e3e9e1; border-radius: 10px; background: #fff; scrollbar-width: thin; scrollbar-color: #9caf9f #edf1ec; }
-.nia-table-wrap::-webkit-scrollbar { height: 9px; }
-.nia-table-wrap::-webkit-scrollbar-track { border-radius: 999px; background: #edf1ec; }
-.nia-table-wrap::-webkit-scrollbar-thumb { border: 2px solid #edf1ec; border-radius: 999px; background: #9caf9f; }
-.nia-table-wrap::-webkit-scrollbar-thumb:hover { background: #718a75; }
-.sidebar-scrollbar { scrollbar-width: thin; scrollbar-color: #9caf9f #edf1ec; }
-.sidebar-scrollbar::-webkit-scrollbar { width: 9px; }
-.sidebar-scrollbar::-webkit-scrollbar-track { border-radius: 999px; background: #edf1ec; }
-.sidebar-scrollbar::-webkit-scrollbar-thumb { border: 2px solid #edf1ec; border-radius: 999px; background: #9caf9f; }
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background: #718a75; }
-.nia-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.55; }
-.nia-table th, .nia-table td { min-width: 96px; border-bottom: 1px solid #e8ede7; padding: 9px 12px; vertical-align: top; }
-.nia-table th + th, .nia-table td + td { border-left: 1px solid #e8ede7; }
-.nia-table th { background: #f3f6f2; color: #465349; font-weight: 600; white-space: nowrap; }
-.nia-table tbody tr:nth-child(even) { background: #fafbf9; }
-.nia-table tbody tr:last-child td { border-bottom: 0; }
-.request-status { animation: request-status-in .3s ease both; }
-.app-request-status { display: flex; align-items: center; gap: 9px; color: #68746b; font-size: 14px; }
-.app-request-status strong { color: #465349; font-weight: 600; }
-.app-request-logo { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; overflow: hidden; border: 1px solid #e3eae1; border-radius: 8px; background: #fff; color: #62816a; }
-.app-request-logo img { width: 100%; height: 100%; object-fit: cover; }
-@keyframes request-status-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .request-status { animation: none; } }
-.user-message-label { align-self: flex-start; padding-top: 8px; color: #8a958c; font-size: 13px; }
-.message-avatar { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 1px solid #e3eae1; border-radius: 9px; background: #fff; color: #62816a; }
-.message-assistant .message-body { max-width: calc(100% - 40px); padding-top: 3px; }
-.message-tools { display: flex; gap: 1px; margin-top: 9px; }
-.message-tools .icon-button { width: 27px !important; height: 27px !important; }
-@keyframes estate-activity-card-in { from { opacity: 0; transform: translateY(9px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes estate-activity-check-pop { from { opacity: 0; transform: scale(.55) rotate(-16deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
-@keyframes estate-activity-tick { to { stroke-dashoffset: 0; } }
-.chat-error { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px 0 0 40px; padding: 12px 14px; border: 1px solid #f0dfd9; border-radius: 10px; background: #fffaf8; color: #875e54; }
-.chat-error p { margin: 0; font-size: 14px; line-height: 1.5; }
-.chat-error button { height: 34px !important; border-radius: 8px !important; font-size: 13px !important; }
-.api-card { padding: 18px; border: 1px solid #e6ebe4; border-radius: 12px; background: #fff; }
-.card-title-row { display: flex; align-items: flex-start; justify-content: space-between; }
-.card-eyebrow { color: #7c8c7e; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
-.api-card h2 { margin: 7px 0 0; color: #3c4940; font-size: 16px; font-weight: 600; letter-spacing: -.025em; }
-.access-icon { display: grid; width: 34px; height: 34px; margin-bottom: 15px; place-items: center; border-radius: 10px; background: #eff4ed; color: #67846a; }
-.key-placeholder-dot { width: 6px; height: 6px; border-radius: 50%; background: #c3ccc3; }
-.full-button { width: 100%; height: 40px !important; border-radius: 8px !important; background: #52785e !important; font-size: 14px !important; }
-.settings-save-status { display: flex; align-items: center; gap: 5px; color: #738b76; font-size: 14px; }
-.settings-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 23px; }
-.settings-panel-header h2 { margin: 0; color: #3d4941; font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
-.settings-panel-header p { margin: 5px 0 0; color: #858f86; font-size: 14px; }
-.setting-field { display: grid; gap: 7px; margin: 17px 0; color: #606c62; font-size: 13px; font-weight: 500; }
-.setting-field > div { max-width: 440px; }
-.setting-field input { height: 40px !important; border-color: #e3e8e1 !important; border-radius: 8px !important; background: #fff !important; color: #48544b !important; font-size: 14px !important; }
-.setting-field input:read-only { background: #fafbf9 !important; color: #9aa29a !important; }
-.keys-page { overflow-y: auto; }
-.keys-content { width: min(100% - 60px, 980px); margin: 0 auto; padding: 39px 0 42px; }
-.keys-content .page-intro { margin-bottom: 25px; }
-.keys-layout { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); align-items: start; gap: 15px; }
-.key-form, .saved-keys-card { min-width: 0; }
-.key-form .settings-panel-header { margin-bottom: 18px; }
-.key-form .settings-panel-header p { max-width: 310px; line-height: 1.5; }
-.key-form .access-icon { margin: 0; flex: 0 0 34px; }
-.key-form .setting-field { margin: 14px 0; }
-.key-form .setting-field input { width: 100%; max-width: none; }
-.balance-entry { display: flex; align-items: center; gap: 8px; }
-.balance-entry input { min-width: 0; flex: 1; }
-.uncapped-button { height: 40px !important; flex: 0 0 auto; border-radius: 8px !important; font-size: 13px !important; }
-.uncapped-button.selected { background: #52785e !important; color: white !important; }
-.key-form .setting-field small { margin-left: 4px; color: #929b93; font-size: 12px; font-weight: 400; }
-.key-provider { width: 100%; height: 40px; font-size: 14px; }
-.key-form-note { display: flex; align-items: flex-start; gap: 7px; margin: 17px 0 14px; color: #849087; font-size: 13px; line-height: 1.55; }
-.key-form-note svg { flex: 0 0 14px; margin-top: 2px; }
-.key-form .full-button { gap: 7px !important; }
-.key-count { display: grid; min-width: 28px; height: 28px; place-items: center; border-radius: 8px; background: #eef3ed; color: #628069; font-size: 13px; font-weight: 600; }
-.model-state { flex: 0 0 auto; padding: 4px 7px; border-radius: 6px; background: #f2f3f1; color: #858d86; font-size: 11px; font-weight: 600; text-transform: capitalize; }
-.model-state.active { background: #edf4ec; color: #5c8062; }
-.model-list-actions { display: flex; align-items: center; gap: 9px; }
-.model-add-link { display: inline-flex; height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #e4e9e2; border-radius: 8px; color: #58745d; font-size: 13px; font-weight: 500; }
-.model-add-link:hover { border-color: #cfdcce; background: #f8faf7; }
-.model-order-row { cursor: grab; transition: background .15s ease, opacity .15s ease; }
-.model-order-row:hover { background: #fcfdfa; }
-.model-order-row:active { cursor: grabbing; }
-.model-order-row.is-dragging { opacity: .45; }
-.model-order-index { display: grid; width: 24px; flex: 0 0 24px; place-items: center; color: #8a958b; font-size: 12px; font-weight: 600; }
-.model-provider-link { color: inherit; text-decoration: underline; text-decoration-color: #c4cec2; text-underline-offset: 3px; }
-.model-provider-link:hover { color: #365e45; text-decoration-color: currentColor; }
-.provider-test-card { display: grid; gap: 12px; }
-.provider-test-result pre { max-height: 320px; overflow: auto; margin: 0; padding: 14px; border: 1px solid #e7ebe5; border-radius: 10px; background: #f8faf7; color: #344239; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.model-drag-handle { color: #a0aaa1; font-size: 20px; line-height: 1; }
-.add-model-content { max-width: 720px; }
-.add-model-form { padding: 20px; }
-.add-model-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; }
-.add-model-actions .full-button { width: auto; min-width: 150px; }
-.provider-code-hint { color: #89928b; font-size: 12px; font-weight: 400; }
-.provider-status-button { height: 30px !important; flex: 0 0 auto; padding: 0 8px !important; color: #728074 !important; font-size: 12px !important; }
-.reqmethod-input { width: 100%; min-height: 150px; padding: 11px 12px; resize: vertical; border: 1px solid #e3e8e1; border-radius: 8px; background: #fff; color: #48544b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6; }
-.reqmethod-input:focus { border-color: #bdcfbf; outline: 2px solid #597f5b12; }
-.saved-keys-description { margin: 8px 0 15px; color: #818b83; font-size: 14px; line-height: 1.55; }
-.keys-message { margin: 0 0 11px; padding: 9px 11px; border: 1px solid #f0d8d5; border-radius: 8px; background: #fff9f8; color: #a2564f; font-size: 13px; }
-.keys-message.success { border-color: #deeadc; background: #f8fbf7; color: #5f8062; }
-.keys-empty { display: flex; min-height: 110px; align-items: center; justify-content: center; gap: 9px; border: 1px dashed #e4e9e2; border-radius: 9px; color: #879188; font-size: 14px; }
-.saved-key-list { display: grid; }
-.saved-key-row { display: flex; min-width: 0; align-items: center; gap: 11px; padding: 14px 0; border-top: 1px solid #edf0ec; }
-.saved-key-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 10px; background: #eff4ed; color: #66846a; }
-.saved-key-details { display: grid; min-width: 0; flex: 1; gap: 3px; }
-.saved-key-details strong { overflow: hidden; color: #4b584e; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.saved-key-details strong span { color: #7b887d; font-weight: 400; }
-.saved-key-link { color: inherit; text-decoration: none; }
-.saved-key-link:hover strong { color: #52785e; }
-.saved-key-details code { color: #818c83; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.saved-key-details small { color: #919a92; font-size: 12px; }
-.key-detail-card { max-width: 760px; }
-.key-detail-list { display: grid; margin: 18px 0 0; border-top: 1px solid #edf0ec; }
-.key-detail-list > div { display: grid; grid-template-columns: minmax(120px, .35fr) minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid #edf0ec; }
-.key-detail-list dt { color: #818b83; font-size: 13px; }
-.key-detail-list dd { margin: 0; color: #4b584e; font-size: 14px; overflow-wrap: anywhere; }
-.key-detail-list code { color: #818c83; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.key-detail-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
-.remove-detail-key { color: #a2564f !important; }
-.remove-key-button { width: 30px !important; height: 30px !important; flex: 0 0 30px; color: #929b93 !important; font-size: 21px !important; }
-.remove-key-button:hover { background: #fff0ee !important; color: #b3544d !important; }
-.key-security-note { display: flex; align-items: center; gap: 8px; margin-top: 15px; padding-top: 13px; border-top: 1px solid #edf0ec; color: #879188; font-size: 13px; }
-.key-security-note svg { flex: 0 0 16px; }
-
-@media (max-width: 760px) {
-  .topbar { padding: 0 20px; }
-  .keys-content { width: min(100% - 40px, 980px); padding-top: 28px; }
-  .keys-layout { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 600px) {
-  .topbar { height: 53px; flex-basis: 53px; padding: 0 15px; }
-  .chat-empty { width: min(100% - 32px, 500px); padding: 24px 0 32px; }
-  .chat-empty h1 { font-size: 36px; }
-  .greeting-copy { max-width: 330px; font-size: 15px; }
-  .suggestion-grid { gap: 7px; margin-top: 25px; }
-  .suggestion-card { min-height: 64px; gap: 8px; padding: 9px; }
-  .suggestion-symbol { width: 29px; height: 29px; flex-basis: 29px; }
-  .suggestion-card strong { font-size: 13px; }
-  .suggestion-card small { font-size: 12px; }
-  .suggestion-arrow { display: none; }
-  .composer-wrap { width: calc(100% - 28px); padding-bottom: 11px; }
-  .composer-hint { display: none; }
-  .message-list { width: calc(100% - 30px); margin-top: 22px; }
-  .keys-content { width: calc(100% - 30px); padding-top: 22px; }
+:root {
+  --font-jetbrains-mono: 'JetBrains Mono', monospace;
 }
