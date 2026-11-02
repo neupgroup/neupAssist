@@ -20,7 +20,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${outfit.variable} m-0 min-h-screen bg-background font-sans text-foreground`}><ServerLayout>{children}</ServerLayout></body>
+      <body className={`${outfit.variable} m-0 min-h-screen bg-white font-sans text-foreground`}><ServerLayout>{children}</ServerLayout></body>
     </html>
   );
 }

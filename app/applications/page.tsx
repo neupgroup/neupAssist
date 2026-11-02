@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ensureAccount } from "@neup/shared/account/self";
 import { prisma } from "@neup/core/database/prisma";
 import { getPublicAccountToken } from "@/services/request/auth";
+import { Input } from "@neup/components/ui/input";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +80,7 @@ export default async function AppsAndIntegrationsPage() {
 
         <label className="mb-5 block">
           <span className="sr-only">Search applications</span>
-          <input type="search" placeholder="Search applications" className="h-11 w-full rounded-lg border border-[#dfe5df] bg-white px-4 text-sm text-[#465349] outline-none placeholder:text-[#89938a] focus:border-[#78927b] focus:ring-2 focus:ring-[#78927b]/15" />
+          <Input type="search" placeholder="Search applications" aria-label="Search applications" className="h-11 w-full rounded-lg border-border bg-card text-sm text-foreground placeholder:text-muted-foreground" />
         </label>
 
         {error ? (

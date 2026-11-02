@@ -5,26 +5,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import HeaderSidebarV1 from "@neup/components/layout/headerSidebar.v1";
 import type { SidebarLink, SidebarLinkGroup } from "@neup/components/layout/headerSidebar.v1";
-import { LetterImage } from "@neup/components/ui/letterImage";
 import { chatClientService } from "../services/client";
-import { Code2, MessageCircle, Plus, Settings2 } from "lucide-react";
+import { Code2, MessageCircle, PenLine, Settings2 } from "lucide-react";
 
 type SavedChat = { id: string; title: string; lastUpdated: string };
 type SidebarIcon = ComponentType<{ className?: string }>;
 
 /** Builds the sidebar groups from the app navigation and recent conversations. */
-function createSidebarLinks(chats: SavedChat[], profile: { name: string; image: string | null } | null): SidebarLinkGroup[] {
-  /** Renders the signed-in user's avatar in the shared sidebar navigation. */
-  function ProfileSidebarIcon({ className }: { className?: string }) {
-    const initials = profile?.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("") || "U";
-    return <LetterImage src={profile?.image} initials={initials} alt={profile?.name || "Profile"} className={`${className ?? ""} rounded-full`} fontSize="10px" />;
-  }
-
+function createSidebarLinks(chats: SavedChat[]): SidebarLinkGroup[] {
   const links: Array<SidebarLink & { icon: SidebarIcon }> = [
-    { href: "/chat", label: "New chat", icon: Plus },
+    { href: "/chat", label: "New chat", icon: PenLine },
     { href: "/applications", label: "Applications", icon: Code2 },
     { href: "/settings", label: "Manage", icon: Settings2 },
-    { href: "/profile", label: "Profile", icon: ProfileSidebarIcon },
   ];
 
   const groups: SidebarLinkGroup[] = [{ links }];
@@ -33,7 +25,7 @@ function createSidebarLinks(chats: SavedChat[], profile: { name: string; image: 
       label: "Recent chats",
       links: chats.map((chat) => ({
         href: `/chat/${chat.id}`,
-        label: <span className="block max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap">{chat.title || "Untitled chat"}</span>,
+        label: <span className="block w-[150px] min-w-0 max-w-full truncate">{chat.title || "Untitled chat"}</span>,
         icon: MessageCircle,
       })),
     });
@@ -88,8 +80,9 @@ export function ClientLayout({ children, profile }: {
   );
 
   return (
-    <HeaderSidebarV1
-      sidebarlinks={createSidebarLinks(chats, profile)}
+    <div className="[&_nav]:gap-3 [&_nav>div>a:not(:first-child)]:mt-1">
+      <HeaderSidebarV1
+      sidebarlinks={createSidebarLinks(chats)}
       pofileBarInfo={{
         href: "/profile",
         displayName: profile?.name ?? "Profile",
@@ -97,8 +90,9 @@ export function ClientLayout({ children, profile }: {
         neupid: profile?.username ?? null,
       }}
       headerLinks={[headerLinks]}
-    >
-      {children}
-    </HeaderSidebarV1>
+      >
+        {children}
+      </HeaderSidebarV1>
+    </div>
   );
 }
