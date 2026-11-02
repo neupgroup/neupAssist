@@ -1,6 +1,8 @@
 import "server-only";
 import { headers } from "next/headers";
 
+export { auth } from "@neup/logica/account/auth";
+
 type CookieReader = (name: string) => Promise<string | null | undefined>;
 
 /** Reads the public app credential from the auth cookie before the x-auth header. */

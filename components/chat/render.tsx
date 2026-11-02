@@ -5,9 +5,13 @@ import { EstateTeamLeads } from "./estate.teamleads";
 import { ChatImages } from "./image";
 import { EstateSavedProperty } from "./estate.savedproperty";
 import { EstateActivityConfirmation, type EstateActivity } from "./estate.activity-confirmation";
+import { NiaPhone } from "../nia/phone";
+import { NiaLead } from "../nia/lead";
+import { NiaWarning } from "../nia/warning";
+import { SafeNiaHtml, sanitizeNiaHtml } from "../nia/safe-html";
 
-type BlockType = "base" | "mine" | "team" | "savedProperty" | "activityConfirmation" | "image";
-type ChatBlock = { type: BlockType; content: string };
+type BlockType = "base" | "mine" | "team" | "savedProperty" | "activityConfirmation" | "image" | "direct";
+type ChatBlock = { type: BlockType; content: string; blockName?: string };
 type ToolFormatHint = { format: string };
 
 /** Renders explicit Nia link tags and markdown links as safe actionable anchors. */
@@ -61,14 +65,13 @@ function renderMarkdownInline(text: string): ReactNode[] {
   return nodes;
 }
 
-/** Sanitizes model generated HTML to a small set of presentational card elements. */
-function sanitizeChatHtml(html: string): string {
-  return html
-    .replace(/<(script|style|iframe|object|embed|form|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
-    .replace(/<(script|style|iframe|object|embed|form|svg|math)\b[^>]*\/?>/gi, "")
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s+(?:src|href)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, "")
-    .replace(/\s+(?:src|href)\s*=\s*javascript:[^\s>]*/gi, "");
+/** Renders an app supplied Nia block as HTML without converting its contents to Markdown. */
+function NiaBlock({ blockName, content }: { blockName: string; content: string }) {
+  const normalizedName = blockName.trim().toLowerCase();
+  if (normalizedName === "phone") return <NiaPhone html={content} />;
+  if (normalizedName === "lead") return <NiaLead html={content} />;
+  if (normalizedName === "warning") return <NiaWarning html={content} />;
+  return <div data-nia-block={blockName}><SafeNiaHtml html={content} /></div>;
 }
 
 /** Renders raw HTML card blocks embedded in Markdown as sanitized HTML. */
@@ -79,7 +82,7 @@ function renderMarkdownHtml(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   const leadingText = normalizedText.slice(0, htmlStart);
   if (leadingText.trim()) nodes.push(...renderMarkdownText(leadingText, `${keyPrefix}-text`));
-  const html = sanitizeChatHtml(normalizedText.slice(htmlStart));
+  const html = sanitizeNiaHtml(normalizedText.slice(htmlStart));
   nodes.push(<div key={`${keyPrefix}-html`} className="chat-html-card" dangerouslySetInnerHTML={{ __html: html }} />);
   return nodes;
 }
@@ -261,8 +264,23 @@ function renderNiaTable(content: string, key: string): ReactNode {
   return renderTableRows(rows, rows[0].map(() => "left"), key);
 }
 
-/** Splits supported nia fenced blocks from the surrounding assistant text. */
+/** Splits app supplied nia block elements before parsing any surrounding assistant text. */
 function splitChatBlocks(text: string, toolFormats: ToolFormatHint[] = []): Array<string | ChatBlock> {
+  const blocks: Array<string | ChatBlock> = [];
+  const pattern = /<nia\s+block\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))\s*>([\s\S]*?)<\/nia\s*>/gi;
+  let cursor = 0;
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) blocks.push(...splitFormattedChatBlocks(text.slice(cursor, start), toolFormats));
+    blocks.push({ type: "direct", blockName: match[1] ?? match[2] ?? match[3] ?? "", content: match[4] });
+    cursor = start + match[0].length;
+  }
+  if (cursor < text.length) blocks.push(...splitFormattedChatBlocks(text.slice(cursor), toolFormats));
+  return blocks;
+}
+
+/** Splits supported legacy fenced blocks from ordinary assistant text. */
+function splitFormattedChatBlocks(text: string, toolFormats: ToolFormatHint[] = []): Array<string | ChatBlock> {
   const blocks: Array<string | ChatBlock> = [];
   const declaredFormats = toolFormats.length
     ? new Set(toolFormats.flatMap(({ format }) => Array.from(format.matchAll(/```(nia\.[a-zA-Z0-9_.-]+)/g), (match) => match[1])))
@@ -332,6 +350,9 @@ function parseImages(content: string): string[] {
 
 /** Renders a recognized block or leaves malformed block content readable. */
 function renderBlock(block: ChatBlock, key: number): ReactNode {
+  if (block.type === "direct") {
+    return <NiaBlock key={key} blockName={block.blockName ?? ""} content={block.content} />;
+  }
   if (block.type === "image") {
     const images = parseImages(block.content);
     return images.length ? <ChatImages key={key} images={images} /> : <p key={key}>{block.content}</p>;

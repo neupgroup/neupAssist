@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@neup/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@neup/components/ui/alert-dialog";
 import { Link } from "@neup/components/ui/link";
+import { Userbar } from "@neup/components/element/userbar";
 import { Icon } from "./ui-icon";
 
 const navigation = [
@@ -19,8 +20,9 @@ const navigation = [
 ];
 
 type SavedChat = { id: string; title: string; lastUpdated: string };
+type WorkspaceProfile = { displayName: string; displayImage: string | null; neupid: string };
 
-export function WorkspaceShell({ children }: { children: React.ReactNode }) {
+export function WorkspaceShell({ children, profile }: { children: React.ReactNode; profile: WorkspaceProfile | null }) {
   const pathname = usePathname();
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [chatActionError, setChatActionError] = useState("");
@@ -100,8 +102,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         {chatActionError && <p className="mx-[9px] mt-2 text-xs text-[#a2564f]" role="alert">{chatActionError}</p>}
 
         <div className="mt-auto grid gap-[10px] max-[600px]:hidden">
-          <div className="flex items-center gap-[9px] rounded-[10px] border border-[#e7eae4] bg-[#fffefa] px-[10px] py-[11px]"><span className="grid h-[29px] w-[29px] shrink-0 place-items-center rounded-[9px] bg-[#edf3ec] text-[#52785c]"><Icon name="sparkles" size={15} /></span><div className="grid min-w-0 gap-[2px]"><strong className="text-[13px] font-semibold text-[#37423a]">Nia Personal</strong><span className="text-[12px] text-[#909891]">Personal assistant workspace</span></div><span className="ml-auto inline-block h-[6px] w-[6px] shrink-0 rounded-full bg-[#6eaa79] shadow-[0_0_0_3px_#6eaa791b]" /></div>
-          <Button variant="plain" className="!min-h-[45px] !w-full !justify-start !gap-[9px] !px-1 !py-[5px] text-left"><span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[#d9e5d9] text-[12px] font-semibold text-[#43604a]">K</span><span className="grid min-w-0 flex-1 gap-[2px]"><strong className="text-[13px] font-semibold text-[#37423a]">Kishor Neupane</strong><span className="text-[12px] text-[#909891]">Personal workspace</span></span><Icon name="settings" size={16} className="text-[#8b948d]" /></Button>
+          {profile && <Link href="/profile" aria-label="Open your profile" className="block min-w-0 rounded-[10px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#78927b]"><Userbar displayName={profile.displayName} displayImage={profile.displayImage} neupid={profile.neupid} className="!w-full !justify-start !gap-[9px] !rounded-[9px] !py-[6px] !pl-[10px] !pr-2 hover:!border-[#e7eae4] hover:!bg-[#fffefa]" /></Link>}
         </div>
       </aside>
       <main className="relative flex h-dvh min-w-0 flex-1 flex-col max-[600px]:h-[calc(100dvh-61px)]">{children}</main>

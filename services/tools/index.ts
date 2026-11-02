@@ -17,6 +17,8 @@ export type ToolCall = { id: string; name: string; arguments: Record<string, unk
 
 export type ToolExecutionContext = { authAccountToken?: string | null; arguments?: Record<string, unknown> };
 
+const directNiaBlockGuideline = 'If application data contains a complete <nia block="name">...</nia> element, preserve the element and its contents verbatim. Do not summarize, rewrite, or convert its contents to Markdown unless the user explicitly asks for that conversion.';
+
 /** Defines the tool discovery entry sent to models. */
 export const app_discoverToolsDefinition: ToolDefinition = {
   name: "app_discoverTools",
@@ -78,8 +80,8 @@ async function discoverAvailableTools(authAccountToken?: string | null) {
       return {
         name,
         description: `${application.name}: ${tool.description}`,
-        format: `Structured data returned by ${application.name}; summarize it in readable Markdown, never raw JSON.`,
-        guidelines: `Summarize the returned ${application.name} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
+        format: `Structured data returned by ${application.name}; summarize it in readable Markdown, never raw JSON, except preserve any complete nia block verbatim.`,
+        guidelines: `${directNiaBlockGuideline} Summarize other returned ${application.name} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML outside nia blocks only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax except when it is inside a preserved nia block. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as Markdown links such as [email@example.com](mailto:email@example.com).`,
       };
     }),
   ];

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/services/request/auth";
 
-/** Sends unauthenticated app requests through NeupID sign-in with their full return URL. */
-export function proxy(request: NextRequest) {
+/** Sends unauthenticated and temporary accounts through NeupID with the full return URL. */
+export async function proxy(request: NextRequest) {
   const authCookie = request.cookies.get("auth")?.value?.trim();
   const authHeader = request.headers.get("x-auth")?.trim();
-  if (authCookie || authHeader) return NextResponse.next();
+  const token = authCookie || authHeader;
+  const verification = token ? await auth.verify(token) : null;
+  const payload = verification?.valid ? verification.payload : null;
+  const isTemporary = payload?.guest === true || (typeof payload?.guest === "number" && payload.guest !== 0);
+  if (payload && !isTemporary) return NextResponse.next();
 
   const signInUrl = new URL("https://neupgroup.com/account/auth/start");
   signInUrl.searchParams.set("authenticatesTo", request.nextUrl.href);

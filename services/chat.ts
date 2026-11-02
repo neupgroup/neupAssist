@@ -9,6 +9,8 @@ import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpTool
 import { ensureAccount } from "@neup/shared/account/self";
 import { logApplicationError } from "@/app/server-logger";
 
+const directNiaBlockGuideline = 'If application data contains a complete <nia block="name">...</nia> element, preserve the element and its contents verbatim. Do not summarize, rewrite, or convert its contents to Markdown unless the user explicitly asks for that conversion.';
+
 /** Lists one page of the most recently updated chats for an account. */
 export async function listChats(accountId: string | undefined, limit = 10, offset = 0) {
   await logServiceRun("chat.list", { limit, offset });
@@ -311,8 +313,8 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: string
         name,
         description: `${application.app}: ${tool.description}`,
         parameters: { type: "object" as const, properties: tool.inputSchema.properties ?? {}, required: tool.inputSchema.required ?? [] },
-        format: `Structured data returned by ${application.app}; summarize it in readable Markdown, never raw JSON.`,
-        guidelines: `Summarize the returned ${application.app} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
+        format: `Structured data returned by ${application.app}; summarize it in readable Markdown, never raw JSON, except preserve any complete nia block verbatim.`,
+        guidelines: `${directNiaBlockGuideline} Summarize other returned ${application.app} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML outside nia blocks only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax except when it is inside a preserved nia block. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).`,
       };
     }),
   ];
@@ -351,7 +353,7 @@ export async function sendChat(messages: ChatMessage[], requestedChatId?: string
             const startedAt = Date.now();
             const data = await callMcpTool(applicationTool.endpoint, token, applicationTool.name, toolCall.arguments);
             await logCallerEvent({ accountId: account?.id, applicationId: applicationTool.application.id, log: { phase: "tool_call", application: applicationTool.application.app, tool: applicationTool.name, argumentKeys: Object.keys(toolCall.arguments), outcome: "success", durationMs: Date.now() - startedAt } });
-            const result = { name: toolCall.name, data, format: `Structured data returned by ${applicationTool.application.app}; summarize it in readable Markdown, never raw JSON.`, guidelines: `Summarize the returned ${applicationTool.application.app} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as [email@example.com](mailto:email@example.com).` };
+            const result = { name: toolCall.name, data, format: `Structured data returned by ${applicationTool.application.app}; summarize it in readable Markdown, never raw JSON, except preserve any complete nia block verbatim.`, guidelines: `${directNiaBlockGuideline} Summarize other returned ${applicationTool.application.app} data in clear, presentable Markdown. For structured records such as leads, properties, cards, or contacts, use readable Markdown headings and lists. Generate HTML outside nia blocks only when the user explicitly requests HTML. Use Markdown tables when requested or useful for comparison. Never output raw JSON or JSON syntax except when it is inside a preserved nia block. Preserve returned facts, say when requested information is absent, and do not invent details. Show phone numbers as Markdown links such as [phone](tel:+15551234567) and emails as Markdown links such as [email@example.com](mailto:email@example.com).` };
             toolFormats.push({ name: result.name, format: result.format, guidelines: result.guidelines });
             return { id: toolCall.id, ...result };
           }
