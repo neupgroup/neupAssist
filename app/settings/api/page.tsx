@@ -16,7 +16,6 @@ export default function ApiSettingsPage() {
         <section className="mb-4 rounded-xl border border-[#e6ebe4] bg-white p-[22px] max-[600px]:p-4" aria-labelledby="responses-api-title">
           <p className="mb-1 text-[11px] font-bold tracking-[.12em] text-[#77917a]">RESPONSES API</p>
           <h2 id="responses-api-title" className="m-0 text-lg font-semibold tracking-[-.02em] text-[#3d4941]">Send a request</h2>
-          <p className="mt-[6px] text-[14px] leading-6 text-[#858f86]">The system prompt and persona from <code>prompts.json</code> are included by default. Set <code>x-token</code> to your API key; provide any one or more of the system, developer, and user inputs in that order. The endpoint returns a completed JSON response.</p>
           <pre className="mt-4 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`POST /bridge/api.v1/responses
 x-token: YOUR_API_KEY
 Content-Type: application/json
@@ -30,6 +29,22 @@ Content-Type: application/json
     { "type": "text", "role": "user", "text": "Your prompt here" }
   ]
 }`}</code></pre>
+          <h3 className="mb-0 mt-5 text-sm font-semibold text-[#3d4941]">Success response</h3>
+          <pre className="mt-3 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`{
+  "success": true,
+  "data": {
+    "id": "resp_...",
+    "createdAt": "2026-11-02T12:00:00.000Z",
+    "output": [
+      { "type": "text", "value": "The assistant's reply" }
+    ]
+  }
+}`}</code></pre>
+          <p className="mb-0 mt-3 text-[13px] leading-5 text-[#858f86]">Set <code>stream</code> to <code>true</code> to receive newline-delimited JSON events. Each output event adds entities to <code>data.output</code>; the final event has <code>data.done: true</code>.</p>
+          <pre className="mt-3 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`{"success":true,"data":{"id":"resp_...","output":[{"type":"text","value":"Hello"}]}}
+{"success":true,"data":{"id":"resp_...","output":[{"type":"text","value":" there!"}]}}
+{"success":true,"data":{"id":"resp_...","done":true}}`}</code></pre>
+          <p className="mb-0 mt-3 text-[13px] leading-5 text-[#858f86]">Errors use the same app-owned envelope: <code>{'{ "success": false, "error": { "code": "...", "description": "..." } }'}</code>.</p>
         </section>
 
         <div className="grid gap-4">

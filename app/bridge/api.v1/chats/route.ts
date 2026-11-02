@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCookie } from "@neup/core/helpers/cookie";
 import { logApplicationError } from "@/app/server-logger";
 import { ensureAccount } from "@neup/shared/account/self";
 import { createChat, deleteAllAccountChats, deleteChat, getChat, listChats } from "@/services/chat";
-import { getPublicAccountToken } from "@/services/request/auth";
+import { getBridgeEndpointAccountToken } from "@/services/request/auth";
 
 export const runtime = "nodejs";
 
@@ -25,7 +24,7 @@ export async function GET(request: Request) {
     const limit = getPaginationValue(url.searchParams.get("limit"), 10, 100);
     const offset = getPaginationValue(url.searchParams.get("offset"), 0, 1000000);
     if (limit === null || offset === null) return NextResponse.json({ error: "Limit and offset must be non-negative integers." }, { status: 400 });
-    const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     return NextResponse.json(await listChats(account?.id, limit, offset));
   }
@@ -38,7 +37,7 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { /* An empty request creates a default titled chat. */ }
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Request body must be a JSON object." }, { status: 400 });
     const input = body as { title?: unknown; chatId?: unknown };
-    const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
 
     if (input.chatId !== undefined) {
@@ -60,12 +59,12 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     if (url.searchParams.get("all") === "true") {
-      const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+      const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
       if (!account) return NextResponse.json({ error: "Sign in to delete your saved chats." }, { status: 401 });
       const deleted = await deleteAllAccountChats(account.id);
       return NextResponse.json({ deleted });
     }
-    const account = await ensureAccount(await getPublicAccountToken(getCookie, request));
+    const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const chatId = url.searchParams.get("id");
     if (!isChatUuid(chatId)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });

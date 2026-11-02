@@ -3,6 +3,10 @@ import { auth } from "@/services/request/auth";
 
 /** Sends unauthenticated and temporary accounts through NeupID with the full return URL. */
 export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === "/bridge" || request.nextUrl.pathname.startsWith("/bridge/")) {
+    return NextResponse.next();
+  }
+
   const authCookie = request.cookies.get("auth")?.value?.trim();
   const authHeader = request.headers.get("x-auth")?.trim();
   const token = authCookie || authHeader;

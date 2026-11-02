@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCookie } from "@neup/core/helpers/cookie";
 import { ensureAccount } from "@neup/shared/account/self";
 import { logApplicationError } from "@/app/server-logger";
 import { listChatMessages, sendChat } from "@/services/chat";
-import { getPublicAccountToken } from "@/services/request/auth";
+import { getBridgeEndpointAccountToken } from "@/services/request/auth";
 
 export const runtime = "nodejs";
 
@@ -28,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const limit = getPaginationValue(url.searchParams.get("limit"), 20, 100);
     const offset = getPaginationValue(url.searchParams.get("offset"), 0, 1000000);
     if (limit === null || offset === null) return NextResponse.json({ error: "Limit and offset must be non-negative integers." }, { status: 400 });
-    const authToken = await getPublicAccountToken(getCookie, request);
+    const authToken = await getBridgeEndpointAccountToken(request);
     const account = await ensureAccount(authToken);
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const result = await listChatMessages(id, account?.id, limit, offset);
@@ -51,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     if (!isChatUuid(id)) return NextResponse.json({ error: "Chat ID must be a UUID." }, { status: 400 });
-    const authToken = await getPublicAccountToken(getCookie, request);
+    const authToken = await getBridgeEndpointAccountToken(request);
     const account = await ensureAccount(authToken);
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     const ownedChat = await listChatMessages(id, account?.id, 1, 0);

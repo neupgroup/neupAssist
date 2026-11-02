@@ -14,10 +14,7 @@ export async function getPublicAccountToken(getCookie: CookieReader, request?: R
   return requestHeaders.get("x-auth")?.trim() || undefined;
 }
 
-/** Reads the bridge endpoint credential from x-auth before the auth cookie. */
-export async function getBridgeEndpointAccountToken(request: Request, getCookie: CookieReader) {
-  const headerToken = request.headers.get("x-auth")?.trim();
-  if (headerToken) return headerToken;
-
-  return (await getCookie("auth"))?.trim() || undefined;
+/** Reads the account credential from the bridge request header without consulting cookies. */
+export function getBridgeEndpointAccountToken(request: Request) {
+  return request.headers.get("x-auth")?.trim() || undefined;
 }
