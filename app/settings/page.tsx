@@ -4,6 +4,7 @@ import { Icon } from "../ui-icon";
 const settingsPages = [
   { href: "/settings/accounts", title: "Accounts", description: "Review account records and activity totals.", icon: "settings" as const },
   { href: "/settings/keys", title: "Keys", description: "Create and manage provider credentials.", icon: "key" as const },
+  { href: "/settings/api", title: "API", description: "View API access and integration guidance.", icon: "code" as const },
   { href: "/settings/applications", title: "Applications", description: "Browse and manage connected applications.", icon: "code" as const },
   { href: "/settings/personalization", title: "Personalization", description: "Choose your language and assistant response preferences.", icon: "settings" as const },
   { href: "/settings/privacy", title: "Privacy", description: "Review privacy information for this workspace.", icon: "help" as const },

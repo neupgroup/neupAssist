@@ -12,7 +12,7 @@ export default function ApiSettingsPage() {
         <section className="mb-4 rounded-xl border border-[#e6ebe4] bg-white p-[22px] max-[600px]:p-4" aria-labelledby="responses-api-title">
           
           <h2 id="responses-api-title" className="m-0 text-lg font-semibold tracking-[-.02em] text-[#3d4941]">Send a request</h2>
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`POST /bridge/api.v1/responses
+          <pre className="mt-4 overflow-x-auto rounded-lg bg-[#f6f8f5] p-4 text-[12px] leading-6 text-[#46524a]"><code>{`POST https://neupgroup.com/assist/bridge/api.v1/responses
 x-token: YOUR_API_KEY
 Content-Type: application/json
 
