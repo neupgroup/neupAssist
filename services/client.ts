@@ -22,3 +22,9 @@ export const keyClientService = {
   remove: (id: string) => serviceRequest(`/bridge/api.v1/manage/keys?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
+export const apiTokenClientService = {
+  list: () => serviceRequest("/bridge/api.v1/manage/api-keys"),
+  create: (expiresInDays: number) => serviceRequest("/bridge/api.v1/manage/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expiresInDays }) }),
+  remove: (id: string) => serviceRequest(`/bridge/api.v1/manage/api-keys?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+};
+
