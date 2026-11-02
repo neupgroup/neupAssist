@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
-import { WorkspaceLayout } from "./workspace-layout";
+import { ServerLayout } from "./layout.server";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -20,7 +20,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${outfit.variable} m-0 min-h-screen bg-background font-sans text-foreground`}><WorkspaceLayout>{children}</WorkspaceLayout></body>
+      <body className={`${outfit.variable} m-0 min-h-screen bg-background font-sans text-foreground`}><ServerLayout>{children}</ServerLayout></body>
     </html>
   );
 }

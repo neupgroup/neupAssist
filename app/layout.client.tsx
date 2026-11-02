@@ -42,7 +42,7 @@ function createSidebarLinks(chats: SavedChat[], profile: { name: string; image: 
 }
 
 /** Renders the shared header/sidebar layout and keeps recent chats current. */
-export function WorkspaceShell({ children, profile }: {
+export function ClientLayout({ children, profile }: {
   children: ReactNode;
   profile: { name: string; image: string | null; username: string | null } | null;
 }) {
