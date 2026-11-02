@@ -92,18 +92,18 @@ export async function POST(request: Request) {
     return errorResponse("invalid_x_token_value", "The x-token header contains a false-like value. Check that your app passes the actual API token instead of false, null, or undefined.", 401);
   }
 
-  const developmentToken = process.env.RESPONSES_DEV_API_TOKEN?.trim();
-  const isDevelopmentToken = process.env.NODE_ENV === "development" && Boolean(developmentToken) && token === developmentToken;
-  if (!isDevelopmentToken) {
-    let account;
-    try {
-      account = await ensureAccount(token);
-    } catch (error) {
-      await logApplicationError(error, "POST /bridge/api.v1/responses authentication");
-      return errorResponse("token_validation_failed", "The API token could not be validated.", 401);
-    }
-    if (!account) return errorResponse("invalid_x_token", "The x-token value was rejected. Check that the API token is correct and has not expired.", 401);
+  let account;
+  try {
+    const apiKey = await prisma.apiKey.findFirst({
+      where: { key: token, expired_on: { gt: new Date() } },
+      select: { account: true },
+    });
+    account = apiKey?.account ?? await ensureAccount(token);
+  } catch (error) {
+    await logApplicationError(error, "POST /bridge/api.v1/responses authentication");
+    return errorResponse("token_validation_failed", "The API token could not be validated.", 401);
   }
+  if (!account) return errorResponse("invalid_x_token", "The x-token value was rejected. Check that the API token is correct and has not expired.", 401);
 
   let body: unknown;
   try {

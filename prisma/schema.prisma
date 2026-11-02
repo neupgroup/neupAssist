@@ -43,8 +43,22 @@ model Account {
   messages     Message[]
   integrations Integration[]
   callerLogs   CallerLog[]
+  apiKeys      ApiKey[]
 
   @@map("accounts")
+}
+
+model ApiKey {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id String
+  account    Account  @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  key        String
+  added_on   DateTime @default(now()) @db.Timestamp(3)
+  expired_on DateTime @db.Timestamp(3)
+
+  @@index([key])
+  @@index([account_id])
+  @@map("api_keys")
 }
 
 model Chat {
