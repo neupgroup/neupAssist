@@ -8,6 +8,8 @@ import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition 
 
 export type GoogleModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
 
+export const defaultModel = "googleapis.gemini-3.1-flash-lite";
+
 export const googleRequestFormat = {
   endpoint: "POST /v1beta/interactions",
   body: { model: "string", system_instruction: "string", input: "string" },

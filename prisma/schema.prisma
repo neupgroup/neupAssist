@@ -43,22 +43,23 @@ model Account {
   messages     Message[]
   integrations Integration[]
   callerLogs   CallerLog[]
-  apiKeys      ApiKey[]
+  callerKeys   CallerKey[]
 
   @@map("accounts")
 }
 
-model ApiKey {
+model CallerKey {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   account_id String
   account    Account  @relation(fields: [account_id], references: [id], onDelete: Cascade)
   key        String
   added_on   DateTime @default(now()) @db.Timestamp(3)
   expired_on DateTime @db.Timestamp(3)
+  usage      CallerUsage[]
 
   @@index([key])
   @@index([account_id])
-  @@map("api_keys")
+  @@map("caller_keys")
 }
 
 model Chat {
@@ -130,5 +131,18 @@ model CallerLog {
 
   @@index([account_id, timestamp])
   @@index([application_id, timestamp])
-  @@map("callerLogs")
+  @@map("caller_logs")
+}
+
+model CallerUsage {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  callerkey_id String    @db.Uuid
+  callerkey    CallerKey @relation(fields: [callerkey_id], references: [id], onDelete: Cascade)
+  input_token  Int
+  output_token Int
+  cost         Decimal   @db.Decimal(18, 16)
+  created_at   DateTime  @default(now()) @db.Timestamp(3)
+
+  @@index([callerkey_id, created_at])
+  @@map("caller_usage")
 }

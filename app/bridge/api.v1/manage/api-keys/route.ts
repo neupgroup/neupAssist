@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   try {
     const account = await ensureAccount(await getBridgeEndpointAccountToken(request));
     if (!account) return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
-    const keys = await prisma.apiKey.findMany({
+    const keys = await prisma.callerKey.findMany({
       where: { account_id: account.id },
       select: { id: true, key: true, added_on: true, expired_on: true },
       orderBy: { added_on: "desc" },
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const token = createApiToken();
   const expiredOn = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
   try {
-    const apiKey = await prisma.apiKey.create({
+    const apiKey = await prisma.callerKey.create({
       data: { account_id: account.id, key: token, expired_on: expiredOn },
       select: { id: true, added_on: true, expired_on: true },
     });
@@ -77,7 +77,7 @@ export async function DELETE(request: Request) {
   if (!isApiKeyId(id)) return NextResponse.json({ error: "A valid API key ID is required." }, { status: 400 });
 
   try {
-    const result = await prisma.apiKey.deleteMany({ where: { id, account_id: account.id } });
+    const result = await prisma.callerKey.deleteMany({ where: { id, account_id: account.id } });
     if (!result.count) return NextResponse.json({ error: "API key was not found." }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {

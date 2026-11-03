@@ -4,6 +4,10 @@ import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 
 export const modelId = "gemini-3.1-flash-lite";
+export const inputCostPerToken = 0.000025;
+export const outputCostPerToken = 0.00015;
+export const cachedInputCostPerToken = 0.0000025;
+export const audioInputToken = 0.00005;
 
 export const requestFormat = {
   method: "POST",

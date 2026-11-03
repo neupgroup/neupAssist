@@ -99,6 +99,7 @@ export default function ApiKeysPage() {
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-[min(calc(100%-60px),900px)] py-[39px] pb-[42px] max-[760px]:w-[min(calc(100%-40px),900px)] max-[760px]:pt-7 max-[600px]:w-[calc(100%-30px)] max-[600px]:pt-[22px]">
         <Link href="/settings/api" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><Icon name="arrowRight" className="rotate-180" size={15} /> API settings</Link>
+        <Link href="/settings/api/usage" className="mb-4 ml-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><Icon name="code" size={15} /> API usage</Link>
         <div className="mb-6">
           <h1 className="m-0 text-[clamp(35px,4vw,47px)] font-medium tracking-[-.055em] text-foreground">API keys</h1>
           <p className="mt-2 text-[15px] text-muted-foreground">Create keys for requests to the Responses API. Send them in the <code className="rounded bg-muted px-1.5 py-0.5 text-[13px]">x-token</code> header.</p>

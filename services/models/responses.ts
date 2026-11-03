@@ -8,7 +8,19 @@ import { buildOpenAIRequest, readOpenAIResponse } from "./openai.default";
 import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.default";
 
 export type ResponsePromptItem = { type: "text"; role: string; text: string };
-type ProviderResponse = { output: string } | { error: string; status: number };
+type TokenUsage = { inputTokens: number; outputTokens: number };
+type ProviderResponse = { output: string; usage: TokenUsage } | { error: string; status: number };
+
+/** Reads common provider usage fields, including custom curl response payloads. */
+function readTokenUsage(payload: any): TokenUsage {
+  const usage = payload?.usage ?? payload?.usageMetadata ?? payload?.response?.usage ?? {};
+  const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? usage.promptTokenCount ?? usage.inputTokenCount ?? 0;
+  const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? usage.candidatesTokenCount ?? usage.outputTokenCount ?? 0;
+  return {
+    inputTokens: Number.isSafeInteger(inputTokens) && inputTokens >= 0 ? inputTokens : 0,
+    outputTokens: Number.isSafeInteger(outputTokens) && outputTokens >= 0 ? outputTokens : 0,
+  };
+}
 
 /** Combines only the root system prompt with caller system instructions. */
 function getSystemInstruction(input: ResponsePromptItem[]) {
@@ -55,6 +67,7 @@ function buildMultiLevelRequest(provider: string, model: string, apiKey: string,
     const request = buildOpenAIRequest({ model, messages: userMessages, systemInstruction, tools: [] });
     request.body.messages = roleMessages as unknown as typeof request.body.messages;
     (request.body as Record<string, unknown>).stream = stream;
+    if (stream) (request.body as Record<string, unknown>).stream_options = { include_usage: true };
     const headers = new Headers(request.headers);
     headers.set("authorization", `Bearer ${apiKey}`);
     return { url: request.url, headers, body: JSON.stringify(request.body) };
@@ -63,6 +76,7 @@ function buildMultiLevelRequest(provider: string, model: string, apiKey: string,
     const request = buildOpenRouterRequest({ model, messages: userMessages, systemInstruction, tools: [] });
     request.body.messages = roleMessages as unknown as typeof request.body.messages;
     (request.body as Record<string, unknown>).stream = stream;
+    if (stream) (request.body as Record<string, unknown>).stream_options = { include_usage: true };
     const headers = new Headers(request.headers);
     headers.set("authorization", `Bearer ${apiKey}`);
     return { url: request.url, headers, body: JSON.stringify(request.body) };
@@ -71,6 +85,7 @@ function buildMultiLevelRequest(provider: string, model: string, apiKey: string,
     const request = buildNvidiaRequest({ model, messages: userMessages, tools: [] });
     request.body.messages = getSingleInstructionMessages(input, systemInstruction) as unknown as typeof request.body.messages;
     (request.body as Record<string, unknown>).stream = stream;
+    if (stream) (request.body as Record<string, unknown>).stream_options = { include_usage: true };
     const headers = new Headers(request.headers);
     headers.set("authorization", `Bearer ${apiKey}`);
     return { url: request.url, headers, body: JSON.stringify(request.body) };
@@ -129,7 +144,7 @@ export async function streamResponsesModel({ provider: rawProvider, model, apiKe
   apiKey: string;
   input: ResponsePromptItem[];
   onText: (text: string) => void;
-}): Promise<{ error: string; status: number } | null> {
+}): Promise<{ error: string; status: number } | { usage: TokenUsage } | null> {
   const provider = rawProvider.toLowerCase();
   const request = buildMultiLevelRequest(provider, model, apiKey, input, true);
 
@@ -148,6 +163,7 @@ export async function streamResponsesModel({ provider: rawProvider, model, apiKe
     const decoder = new TextDecoder();
     let buffer = "";
     let streamedText = false;
+    let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
     const processEvent = (event: string) => {
       for (const line of event.split("\n")) {
         if (!line.startsWith("data:")) continue;
@@ -155,6 +171,8 @@ export async function streamResponsesModel({ provider: rawProvider, model, apiKe
         if (!raw || raw === "[DONE]") continue;
         try {
           const payload = JSON.parse(raw);
+          const reportedUsage = readTokenUsage(payload);
+          if (reportedUsage.inputTokens || reportedUsage.outputTokens) usage = reportedUsage;
           const text = readProviderTextDelta(provider, payload);
           if (text) { streamedText = true; onText(text); }
         } catch { /* Ignore non-JSON keepalive events. */ }
@@ -170,7 +188,7 @@ export async function streamResponsesModel({ provider: rawProvider, model, apiKe
       if (done) break;
     }
     if (buffer.trim()) processEvent(buffer);
-    return streamedText ? null : { error: "The provider returned an empty response.", status: 502 };
+    return streamedText ? { usage } : { error: "The provider returned an empty response.", status: 502 };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "The provider request could not be completed.", status: 502 };
   }
@@ -209,7 +227,7 @@ export async function requestResponsesModel({ provider: rawProvider, model, apiK
     }
 
     const output = readProviderOutput(provider, payload);
-    return typeof output === "string" && output.trim() ? { output: output.trim() } : { error: "The provider returned an empty response.", status: 502 };
+    return typeof output === "string" && output.trim() ? { output: output.trim(), usage: readTokenUsage(payload) } : { error: "The provider returned an empty response.", status: 502 };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "The provider request could not be completed.", status: 502 };
   }

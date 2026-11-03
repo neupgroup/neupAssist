@@ -3,7 +3,9 @@ import { ensureAccount } from "@neup/shared/account/self";
 import { prisma } from "@neup/core/database/prisma";
 import { logApplicationError } from "@/app/server-logger";
 import { requestResponsesModel, streamResponsesModel } from "@/services/models/responses";
-import { defaultNvidiaModel } from "@/services/models/nvidia.default";
+import { defaultModel as defaultGoogleModel } from "@/services/models/google.default";
+import { defaultModel as defaultNvidiaModel } from "@/services/models/nvidia.default";
+import { calculateModelUsageCost, resolveModelDefinition } from "@/services/models/catalog";
 
 export const runtime = "nodejs";
 
@@ -41,7 +43,7 @@ async function getAutomaticCredential() {
   });
   for (const credential of credentials) {
     const provider = credential.provider.trim().toLowerCase();
-    const model = credential.model?.trim() || (provider === "nvidia" ? defaultNvidiaModel : "");
+    const model = credential.model?.trim() || (provider === "google" ? defaultGoogleModel : provider === "nvidia" ? defaultNvidiaModel : "");
     if (provider && model && credential.key.trim()) return { provider, model, apiKey: credential.key };
   }
   return null;
@@ -93,12 +95,14 @@ export async function POST(request: Request) {
   }
 
   let account;
+  let callerKeyId: string | null = null;
   try {
-    const apiKey = await prisma.apiKey.findFirst({
+    const apiKey = await prisma.callerKey.findFirst({
       where: { key: token, expired_on: { gt: new Date() } },
-      select: { account: true },
+      select: { id: true, account: true },
     });
     account = apiKey?.account ?? await ensureAccount(token);
+    callerKeyId = apiKey?.id ?? null;
   } catch (error) {
     await logApplicationError(error, "POST /bridge/api.v1/responses authentication");
     return errorResponse("token_validation_failed", "The API token could not be validated.", 401);
@@ -121,6 +125,22 @@ export async function POST(request: Request) {
   try {
     const credential = await getAutomaticCredential();
     if (!credential) return errorResponse("no_ai_provider_configured", "No AI provider is configured.", 409);
+    const modelDefinition = resolveModelDefinition(credential.provider, credential.model);
+
+    /** Persists usage from a request authenticated with a managed caller key. */
+    const saveCallerUsage = async (usage: { inputTokens: number; outputTokens: number }) => {
+      if (!callerKeyId) return;
+      try {
+        await prisma.callerUsage.create({ data: {
+          callerkey_id: callerKeyId,
+          input_token: usage.inputTokens,
+          output_token: usage.outputTokens,
+          cost: calculateModelUsageCost(modelDefinition.fileName, usage.inputTokens, usage.outputTokens),
+        } });
+      } catch (error) {
+        await logApplicationError(error, "POST /bridge/api.v1/responses usage recording");
+      }
+    };
 
     const responseId = `resp_${crypto.randomUUID().replaceAll("-", "")}`;
     if (payload.stream) {
@@ -130,15 +150,18 @@ export async function POST(request: Request) {
           const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
           let pendingOutput = "";
           try {
-            const failure = await streamResponsesModel({
-              ...credential,
+            const streamResult = await streamResponsesModel({
+              provider: modelDefinition.provider,
+              model: modelDefinition.modelName,
+              apiKey: credential.apiKey,
               input,
               onText: (text) => {
                 emit({ success: true, data: { id: responseId, output: [{ type: "text", value: text }] } });
               },
             });
-            if (failure) emit({ success: false, error: { code: "provider_request_failed", description: failure.error } });
+            if (streamResult && "error" in streamResult) emit({ success: false, error: { code: "provider_request_failed", description: streamResult.error } });
             else {
+              if (streamResult && "usage" in streamResult) await saveCallerUsage(streamResult.usage);
               emit({ success: true, data: { id: responseId, done: true } });
             }
           } catch (error) {
@@ -152,8 +175,9 @@ export async function POST(request: Request) {
       return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform" } });
     }
 
-    const result = await requestResponsesModel({ ...credential, input });
+    const result = await requestResponsesModel({ provider: modelDefinition.provider, model: modelDefinition.modelName, apiKey: credential.apiKey, input });
     if ("error" in result) return errorResponse("provider_request_failed", result.error, result.status);
+    await saveCallerUsage(result.usage);
 
     return NextResponse.json({
       success: true,
@@ -161,6 +185,7 @@ export async function POST(request: Request) {
         id: responseId,
         createdAt: new Date().toISOString(),
         output: [{ type: "text", value: result.output }],
+        usage: { input_tokens: result.usage.inputTokens, output_tokens: result.usage.outputTokens },
       },
     });
   } catch (error) {

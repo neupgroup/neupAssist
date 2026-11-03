@@ -1,6 +1,7 @@
 import "server-only";
 import { requestGoogle } from "./google.default";
 import { requestNvidia } from "./nvidia.default";
+import { requestGeminiFlashLite } from "./googleapis.gemini-3.1-flash-lite";
 import { buildOpenAIRequest, readOpenAIResponse } from "./openai.default";
 import { buildOpenRouterRequest, readOpenRouterResponse } from "./openrouter.default";
 import { buildSystemPrompt } from "../request/prompts";
@@ -9,12 +10,13 @@ import { extractOutputByFormat, renderCurlTemplate, RESPONSE_FORMAT_SEPARATOR } 
 import { logger } from "@neup/logica/logger";
 import { logAIRequest, redactLogSecrets } from "../../app/server-logger";
 import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
+import { resolveModelDefinition } from "./catalog";
 
 export type ModelMessage = ChatTurn;
 
 export type ModelRequest = {
   provider: string;
-  model: string;
+  model?: string;
   apiKey: string;
   messages: ModelMessage[];
   requestFormat?: string | null;
@@ -52,10 +54,13 @@ function readGenericToolCalls(provider: string, result: any): ToolCall[] {
 }
 
 export async function requestModel({ provider: rawProvider, model, apiKey, messages, requestFormat, tools = contextTools }: ModelRequest): Promise<ModelResponse> {
-  const provider = rawProvider.toLowerCase();
-  try { await logger.type("service-run").data({ service: "models.request", provider: rawProvider, model, messageCount: messages.length }).log(); } catch { /* Logging must not interrupt provider request handling. */ }
-  if (provider === "google") return requestGoogle({ model, apiKey, messages, requestFormat, tools });
-  if (provider === "nvidia") return requestNvidia({ model, apiKey, messages, tools });
+  const modelDefinition = resolveModelDefinition(rawProvider, model ?? "");
+  const provider = modelDefinition.provider;
+  const modelName = modelDefinition.modelName;
+  try { await logger.type("service-run").data({ service: "models.request", provider, model: model ?? modelName, modelName, messageCount: messages.length }).log(); } catch { /* Logging must not interrupt provider request handling. */ }
+  if (provider === "google" && modelDefinition.fileName === "googleapis.gemini-3.1-flash-lite") return requestGeminiFlashLite({ apiKey, messages });
+  if (provider === "google") return requestGoogle({ model: modelName, apiKey, messages, requestFormat, tools });
+  if (provider === "nvidia") return requestNvidia({ model: modelName, apiKey, messages, tools });
   const chatHistory = compileChat(messages);
   const defaultSystemPrompt = buildSystemPrompt({ includeTextContext: true });
   const prompt = compileChatPrompt(messages, defaultSystemPrompt);
@@ -70,7 +75,7 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
     if (customFormat) {
       const [curlTemplate, ...responseParts] = customFormat.split(RESPONSE_FORMAT_SEPARATOR);
       responseFormat = responseParts.length ? responseParts.join(RESPONSE_FORMAT_SEPARATOR).trim() : null;
-      const curl = renderCurlTemplate(curlTemplate, { model, provider: rawProvider, input: prompt, chathistory: chatHistory, apikey: apiKey });
+      const curl = renderCurlTemplate(curlTemplate, { model: modelName, provider, input: prompt, chathistory: chatHistory, apikey: apiKey });
       url = curl.url;
       method = curl.method;
       headers = curl.headers;
@@ -82,13 +87,13 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
       if (!headers.has("content-type") && body !== undefined) headers.set("content-type", "application/json");
     } else {
       if (provider === "openrouter") {
-        const request = buildOpenRouterRequest({ model, messages, tools });
+        const request = buildOpenRouterRequest({ model: modelName, messages, tools });
         url = request.url;
         body = JSON.stringify(request.body);
         for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
         headers.set("authorization", `Bearer ${apiKey}`);
       } else if (provider === "openai") {
-        const request = buildOpenAIRequest({ model, messages, tools });
+        const request = buildOpenAIRequest({ model: modelName, messages, tools });
         url = request.url;
         body = JSON.stringify(request.body);
         for (const [name, value] of Object.entries(request.headers)) headers.set(name, value);
@@ -97,18 +102,18 @@ export async function requestModel({ provider: rawProvider, model, apiKey, messa
         url = "https://api.anthropic.com/v1/messages";
         headers.set("x-api-key", apiKey);
         headers.set("anthropic-version", "2023-06-01");
-        body = JSON.stringify({ model, max_tokens: 2048, system: defaultSystemPrompt, messages: [{ role: "user", content: chatHistory }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ name, description, input_schema: parameters })) });
+        body = JSON.stringify({ model: modelName, max_tokens: 2048, system: defaultSystemPrompt, messages: [{ role: "user", content: chatHistory }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ name, description, input_schema: parameters })) });
       } else {
         url = provider === "mistral" ? "https://api.mistral.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
         headers.set("authorization", `Bearer ${apiKey}`);
-        body = JSON.stringify({ model, messages: [{ role: "user", content: prompt }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })), tool_choice: "auto" });
+        body = JSON.stringify({ model: modelName, messages: [{ role: "user", content: prompt }], tools: includeToolDiscovery(tools).map(({ name, description, parameters }) => ({ type: "function", function: { name, description, parameters } })), tool_choice: "auto" });
       }
     }
 
-    await logAIRequest({ provider: rawProvider, model, url, method, headers, body, apiKey });
+    await logAIRequest({ provider, model: modelName, url, method, headers, body, apiKey });
     const response = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(60_000) });
     const responseBody = await response.text();
-    try { await logger.type("ai-response").data({ provider: rawProvider, model, status: response.status, ok: response.ok, response: redactLogSecrets(responseBody, [apiKey]) }).log(); } catch { /* Logging must not interrupt provider response handling. */ }
+    try { await logger.type("ai-response").data({ provider, model: modelName, status: response.status, ok: response.ok, response: redactLogSecrets(responseBody, [apiKey]) }).log(); } catch { /* Logging must not interrupt provider response handling. */ }
     let result: any;
     try { result = JSON.parse(responseBody); } catch { result = null; }
     if (!response.ok) {

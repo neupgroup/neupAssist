@@ -7,7 +7,8 @@ import { modelId as nemotron35BoltE4BModel, requestNemotron35BoltE4B, supportsMo
 import { contextTools, includeToolDiscovery, type ToolDefinition, type ToolCall } from "@/services/tools";
 
 export type NvidiaModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
-export const defaultNvidiaModel = nemotron35BoltE4BModel;
+export const defaultModel = "nvidia.nemotron-3.5-bolt-e4b";
+export const defaultNvidiaModel = defaultModel;
 
 export const nvidiaRequestFormat = {
   endpoint: "POST /v1/chat/completions",
@@ -97,13 +98,13 @@ function invokeCurl({ url, headers, body }: { url: string; headers: Headers; bod
 }
 
 /** Routes NVIDIA requests to the model-specific handler or default format. */
-export async function requestNvidia({ model, apiKey, messages, tools = contextTools }: {
-  model: string;
+export async function requestNvidia({ model = defaultModel, apiKey, messages, tools = contextTools }: {
+  model?: string;
   apiKey: string;
   messages: ChatMessage[];
   tools?: ToolDefinition[];
 }): Promise<NvidiaModelResponse> {
-  if (supportsNemotron35BoltE4B(model)) return requestNemotron35BoltE4B({ apiKey, messages, tools });
+  if (model === defaultModel || supportsNemotron35BoltE4B(model) || model === nemotron35BoltE4BModel) return requestNemotron35BoltE4B({ apiKey, messages, tools });
 
   const request = buildNvidiaRequest({ model, messages, tools });
   const headers = new Headers(request.headers);

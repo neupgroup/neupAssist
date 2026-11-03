@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@neup/core/database/prisma";
 import { contextManager, isContextRequest } from "@/services/request/context-manager";
 import { requestModel } from "@/services/models";
-import { defaultNvidiaModel } from "@/services/models/nvidia.default";
+import { defaultModel as defaultGoogleModel } from "@/services/models/google.default";
+import { defaultModel as defaultNvidiaModel } from "@/services/models/nvidia.default";
 import { logServiceRun } from "@/services/service-logger";
 import { contextTools, executeContextTool, formatToolResult, type ToolDefinition } from "@/services/tools";
 import { callMcpTool, discoverMcpTools, getApplicationMcpEndpoints, type McpToolDefinition } from "@/services/mcp/client";
@@ -89,7 +90,7 @@ function getFallbackCredentials(credentials: SavedCredential[]): ResolvedCredent
 
   for (const credential of credentials) {
     const provider = credential.provider.trim().toLowerCase();
-    const model = credential.model?.trim() || (provider === "nvidia" ? defaultNvidiaModel : "");
+    const model = credential.model?.trim() || (provider === "google" ? defaultGoogleModel : provider === "nvidia" ? defaultNvidiaModel : "");
     if (!provider || !model || providers.has(provider)) continue;
     providers.add(provider);
     resolved.push({ ...credential, model });

@@ -6,6 +6,8 @@ import { logAIRequest, redactLogSecrets } from "@/app/server-logger";
 import { contextTools, includeToolDiscovery, type ToolCall, type ToolDefinition } from "@/services/tools";
 
 export const modelId = "nvidia/nemotron-3.5-bolt-e4b";
+export const inputCostPerToken = 0;
+export const outputCostPerToken = 0;
 const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
 
 export const requestFormat = {
