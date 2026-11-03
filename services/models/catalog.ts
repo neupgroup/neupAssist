@@ -21,6 +21,7 @@ export function resolveModelDefinition(provider: string, selectedModel: string) 
   const providerDefault = normalizedProvider === "google" ? defaultGoogleModel : normalizedProvider === "nvidia" ? defaultNvidiaModel : "";
   const selected = selectedModel.trim() || providerDefault;
   return modelDefinitions.find((definition) => definition.provider === normalizedProvider && definition.modelName === selected)
+    ?? modelDefinitions.find((definition) => definition.provider === normalizedProvider && definition.fileName === selected)
     ?? { fileName: "", provider: normalizedProvider, modelName: selected, inputCostPerToken: 0, outputCostPerToken: 0 };
 }
 

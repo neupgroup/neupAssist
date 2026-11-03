@@ -35,18 +35,40 @@ function parseResponseInput(value: unknown): ResponseInputItem[] | null {
   return input;
 }
 
-/** Selects the first configured provider credential with a usable model. */
-async function getAutomaticCredential() {
+type AutomaticCredential = { provider: string; model: string; apiKey: string };
+
+/** Selects configured provider credentials in newest-first failover order. */
+async function getAutomaticCredentials(failover: boolean): Promise<AutomaticCredential[]> {
   const credentials = await prisma.intelligenceKey.findMany({
     orderBy: { addedOn: "desc" },
     select: { provider: true, model: true, key: true },
   });
+  const candidates: AutomaticCredential[] = [];
+  const seenProviders = new Set<string>();
   for (const credential of credentials) {
     const provider = credential.provider.trim().toLowerCase();
     const model = credential.model?.trim() || (provider === "google" ? defaultGoogleModel : provider === "nvidia" ? defaultNvidiaModel : "");
-    if (provider && model && credential.key.trim()) return { provider, model, apiKey: credential.key };
+    if (!provider || !model || !credential.key.trim()) continue;
+    if (!failover && candidates.length) continue;
+    if (!failover && !candidates.length) candidates.push({ provider, model, apiKey: credential.key });
+    else if (failover && !seenProviders.has(`${provider}:${model}`)) {
+      candidates.push({ provider, model, apiKey: credential.key });
+      seenProviders.add(`${provider}:${model}`);
+    }
   }
-  return null;
+  return candidates;
+}
+
+/** Sends a non-streaming request to candidates until one returns a response. */
+async function requestWithFailover(credentials: AutomaticCredential[], input: ResponseInputItem[]) {
+  let lastFailure: { error: string; status: number } | null = null;
+  for (const credential of credentials) {
+    const modelDefinition = resolveModelDefinition(credential.provider, credential.model);
+    const result = await requestResponsesModel({ ...credential, input });
+    if (!("error" in result)) return { result, modelDefinition } as const;
+    lastFailure = result;
+  }
+  return { result: lastFailure ?? { error: "No AI provider is configured.", status: 409 }, modelDefinition: null } as const;
 }
 
 /** Returns a consistent 405 response for methods this endpoint does not support. */
@@ -119,23 +141,24 @@ export async function POST(request: Request) {
   const payload = body as Record<string, unknown>;
   if (payload.model !== "auto") return errorResponse("unsupported_model", 'The model field must be "auto".', 400);
   if (typeof payload.stream !== "boolean") return errorResponse("invalid_stream_value", "The stream field must be true or false.", 400);
+  if (payload.failover !== undefined && typeof payload.failover !== "boolean") return errorResponse("invalid_failover_value", "The failover field must be true or false.", 400);
   const input = parseResponseInput(payload.input);
   if (!input) return errorResponse("invalid_input", "Order input as system items, instruction-level items, then user items.", 400);
 
   try {
-    const credential = await getAutomaticCredential();
-    if (!credential) return errorResponse("no_ai_provider_configured", "No AI provider is configured.", 409);
-    const modelDefinition = resolveModelDefinition(credential.provider, credential.model);
+    const credentials = await getAutomaticCredentials(payload.failover === true);
+    if (!credentials.length) return errorResponse("no_ai_provider_configured", "No AI provider is configured.", 409);
+    const primaryModelDefinition = resolveModelDefinition(credentials[0].provider, credentials[0].model);
 
     /** Persists usage from a request authenticated with a managed caller key. */
-    const saveCallerUsage = async (usage: { inputTokens: number; outputTokens: number }) => {
+    const saveCallerUsage = async (usage: { inputTokens: number; outputTokens: number }, modelFileName: string) => {
       if (!callerKeyId) return;
       try {
         await prisma.callerUsage.create({ data: {
           callerkey_id: callerKeyId,
           input_token: usage.inputTokens,
           output_token: usage.outputTokens,
-          cost: calculateModelUsageCost(modelDefinition.fileName, usage.inputTokens, usage.outputTokens),
+          cost: calculateModelUsageCost(modelFileName, usage.inputTokens, usage.outputTokens),
         } });
       } catch (error) {
         await logApplicationError(error, "POST /bridge/api.v1/responses usage recording");
@@ -148,22 +171,32 @@ export async function POST(request: Request) {
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
           const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-          let pendingOutput = "";
+          let emittedText = false;
+          let lastFailure: { error: string; status: number } | null = null;
           try {
-            const streamResult = await streamResponsesModel({
-              provider: modelDefinition.provider,
-              model: modelDefinition.modelName,
-              apiKey: credential.apiKey,
-              input,
-              onText: (text) => {
-                emit({ success: true, data: { id: responseId, output: [{ type: "text", value: text }] } });
-              },
-            });
-            if (streamResult && "error" in streamResult) emit({ success: false, error: { code: "provider_request_failed", description: streamResult.error } });
-            else {
-              if (streamResult && "usage" in streamResult) await saveCallerUsage(streamResult.usage);
+            for (const credential of credentials) {
+              const modelDefinition = resolveModelDefinition(credential.provider, credential.model);
+              const streamResult = await streamResponsesModel({
+                provider: modelDefinition.provider,
+                model: modelDefinition.modelName,
+                apiKey: credential.apiKey,
+                input,
+                onText: (text) => {
+                  emittedText = true;
+                  emit({ success: true, data: { id: responseId, output: [{ type: "text", value: text }] } });
+                },
+              });
+              if (streamResult && "error" in streamResult) {
+                lastFailure = streamResult;
+                if (emittedText || payload.failover !== true) break;
+                continue;
+              }
+              if (streamResult && "usage" in streamResult) await saveCallerUsage(streamResult.usage, modelDefinition.fileName);
               emit({ success: true, data: { id: responseId, done: true } });
+              lastFailure = null;
+              break;
             }
+            if (lastFailure) emit({ success: false, error: { code: "provider_request_failed", description: lastFailure.error } });
           } catch (error) {
             await logApplicationError(error, "POST /bridge/api.v1/responses streaming");
             emit({ success: false, error: { code: "provider_unavailable", description: "The configured AI provider could not complete the request." } });
@@ -175,17 +208,17 @@ export async function POST(request: Request) {
       return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform" } });
     }
 
-    const result = await requestResponsesModel({ provider: modelDefinition.provider, model: modelDefinition.modelName, apiKey: credential.apiKey, input });
-    if ("error" in result) return errorResponse("provider_request_failed", result.error, result.status);
-    await saveCallerUsage(result.usage);
+    const attempt = await requestWithFailover(credentials, input);
+    if ("error" in attempt.result) return errorResponse("provider_request_failed", attempt.result.error, attempt.result.status);
+    await saveCallerUsage(attempt.result.usage, attempt.modelDefinition?.fileName ?? primaryModelDefinition.fileName);
 
     return NextResponse.json({
       success: true,
       data: {
         id: responseId,
         createdAt: new Date().toISOString(),
-        output: [{ type: "text", value: result.output }],
-        usage: { input_tokens: result.usage.inputTokens, output_tokens: result.usage.outputTokens },
+        output: [{ type: "text", value: attempt.result.output }],
+        usage: { input_tokens: attempt.result.usage.inputTokens, output_tokens: attempt.result.usage.outputTokens },
       },
     });
   } catch (error) {

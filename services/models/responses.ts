@@ -146,9 +146,9 @@ export async function streamResponsesModel({ provider: rawProvider, model, apiKe
   onText: (text: string) => void;
 }): Promise<{ error: string; status: number } | { usage: TokenUsage } | null> {
   const provider = rawProvider.toLowerCase();
-  const request = buildMultiLevelRequest(provider, model, apiKey, input, true);
 
   try {
+    const request = buildMultiLevelRequest(provider, model, apiKey, input, true);
     await logAIRequest({ provider: rawProvider, model, url: request.url, method: "POST", headers: request.headers, body: request.body, apiKey });
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body, signal: AbortSignal.timeout(60_000) });
     if (!response.ok || !response.body) {
@@ -212,8 +212,8 @@ export async function requestResponsesModel({ provider: rawProvider, model, apiK
   input: ResponsePromptItem[];
 }): Promise<ProviderResponse> {
   const provider = rawProvider.toLowerCase();
-  const request = buildMultiLevelRequest(provider, model, apiKey, input);
   try {
+    const request = buildMultiLevelRequest(provider, model, apiKey, input);
     await logAIRequest({ provider: rawProvider, model, url: request.url, method: "POST", headers: request.headers, body: request.body, apiKey });
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body, signal: AbortSignal.timeout(60_000) });
     const responseBody = await response.text();

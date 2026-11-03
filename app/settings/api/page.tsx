@@ -20,6 +20,7 @@ Content-Type: application/json
 
 {
   "model": "auto",
+  "failover": true,
   "stream": false,
   "input": [
     { "type": "text", "role": "system", "text": "You are Nia, a personal assistant..." },
@@ -38,7 +39,7 @@ Content-Type: application/json
     ]
   }
 }`}</code></pre>
-          <p className="mb-0 mt-3 text-sm leading-6 text-muted-foreground">Set <code>stream</code> to <code>true</code> to receive newline-delimited JSON events. Output events add text to <code>data.output</code>; the final event includes <code>data.done: true</code>.</p>
+          <p className="mb-0 mt-3 text-sm leading-6 text-muted-foreground">Set <code>failover</code> to <code>true</code> to try other configured models when a provider fails; it defaults to <code>false</code>. For streaming requests, failover happens only before output starts. Set <code>stream</code> to <code>true</code> to receive newline-delimited JSON events. Output events add text to <code>data.output</code>; the final event includes <code>data.done: true</code>.</p>
         </section>
 
         <div className="grid grid-cols-1 gap-3">

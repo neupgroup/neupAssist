@@ -7,7 +7,7 @@ import { modelId as nemotron35BoltE4BModel, requestNemotron35BoltE4B, supportsMo
 import { contextTools, includeToolDiscovery, type ToolDefinition, type ToolCall } from "@/services/tools";
 
 export type NvidiaModelResponse = { output: string; toolCalls?: ToolCall[] } | { error: string; status: number };
-export const defaultModel = "nvidia.nemotron-3.5-bolt-e4b";
+export const defaultModel = nemotron35BoltE4BModel;
 export const defaultNvidiaModel = defaultModel;
 
 export const nvidiaRequestFormat = {
